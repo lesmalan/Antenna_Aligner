@@ -113,6 +113,13 @@ class _AlignmentPageState extends State<AlignmentPage> {
         title: Text('Microwave Signal Alignment - Side $_currentSide'),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            tooltip: 'Support Helpline',
+            icon: const Icon(Icons.phone_in_talk),
+            onPressed: _showSupportPrompt,
+          ),
+        ],
       ),
       body: SafeArea(
         child: Column(
@@ -619,6 +626,13 @@ class _AlignmentPageState extends State<AlignmentPage> {
     );
   }
 
+  void _finalizeProcess() {
+    // Finalize the entire process after side 2 confirmation
+    setState(() {
+      _processCompleted = true;
+    });
+  }
+
   void _showConfirmationDialog({
     required String title,
     required String message,
@@ -669,6 +683,80 @@ class _AlignmentPageState extends State<AlignmentPage> {
               backgroundColor: Colors.orange[600],
             ),
             child: const Text('Go Back and Adjust'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Support helpline prompt: asks user for their number and shows placeholder instructions
+  void _showSupportPrompt() {
+    String userNumber = '';
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('Support Helpline'),
+        content: StatefulBuilder(
+          builder: (context, setState) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Enter your phone number so support can call you back (optional):',
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(hintText: '+1 555 555 5555'),
+                onChanged: (v) => userNumber = v.trim(),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              final contact = userNumber.isEmpty
+                  ? '+1-800-555-1234'
+                  : userNumber;
+              _showSupportInstructions(contact);
+            },
+            child: const Text('Request Call'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Placeholder instructions for contacting support
+  void _showSupportInstructions(String userNumber) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('Contacting Support'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Support placeholder instructions:'),
+            const SizedBox(height: 8),
+            Text('Call: +1-800-555-1234'),
+            const SizedBox(height: 6),
+            Text('When prompted, provide this callback number: $userNumber'),
+            const SizedBox(height: 6),
+            const Text('Reference: Provide link ID and signal readings.'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
           ),
         ],
       ),
