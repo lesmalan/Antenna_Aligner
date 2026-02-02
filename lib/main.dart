@@ -48,6 +48,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
   bool _azimuthConfirmed = false;
   bool _elevationConfirmed = false;
   int _currentSide = 1; // Track which side we're aligning (1 or 2)
+  bool _readyToFinalizeProcess =
+      false; // true when side 2 is ready and user must press finalize
+  bool _processCompleted = false; // true when the entire process is finalized
 
   void _updateRSLBasedOnAlignment() {
     // Calculate current RSL based on how aligned we are
@@ -70,6 +73,41 @@ class _AlignmentPageState extends State<AlignmentPage> {
 
   @override
   Widget build(BuildContext context) {
+    // If user has completed the entire process, show final screen
+    if (_processCompleted) {
+      return Scaffold(
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Theme.of(context).colorScheme.primary,
+                Colors.green[700]!,
+              ],
+            ),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.check_circle, size: 120, color: Colors.white),
+                const SizedBox(height: 32),
+                Text(
+                  'System aligned. Please disconned device from antenna.',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text('Microwave Signal Alignment - Side $_currentSide'),
@@ -417,13 +455,32 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   ),
                 ),
               ),
-            if (_currentStep == AlignmentStep.finalized)
+            if (_currentStep == AlignmentStep.finalized && _currentSide == 1)
               ElevatedButton.icon(
                 onPressed: _goToOtherSide,
                 icon: const Icon(Icons.arrow_forward),
                 label: const Text('Go to Other Side'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue[700],
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 16,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            if (_currentStep == AlignmentStep.finalized &&
+                _currentSide == 2 &&
+                _readyToFinalizeProcess)
+              ElevatedButton.icon(
+                onPressed: _finalizeProcess,
+                icon: const Icon(Icons.done_all),
+                label: const Text('Finalize Process'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green[800],
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 32,
@@ -515,6 +572,10 @@ class _AlignmentPageState extends State<AlignmentPage> {
         onConfirm: () {
           setState(() {
             _currentStep = AlignmentStep.finalized;
+            if (_currentSide == 2) {
+              // For side 2, require an extra explicit finalize action
+              _readyToFinalizeProcess = true;
+            }
           });
           Navigator.pop(context);
         },
@@ -547,6 +608,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 _elevationTurnsLeft = 2;
                 _elevationTurnsRight = 0;
                 _currentRSL = -85.5; // Reset to initial misaligned value
+                _readyToFinalizeProcess = false;
+                _processCompleted = false;
               });
             },
             child: const Text('OK'),
