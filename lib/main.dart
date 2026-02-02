@@ -38,7 +38,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
   // TODO: Replace with actual data from LAN microwave signal source
   // This should fetch real RSL (Received Signal Level) data
   double _currentRSL = -85.5; // dBm
-  double _maxRSL = -75.0; // dBm
+  final double _maxRSL = -75.0; // dBm
   int _azimuthTurnsLeft = 3;
   int _azimuthTurnsRight = 0;
   int _elevationTurnsLeft = 2;
@@ -91,14 +91,14 @@ class _AlignmentPageState extends State<AlignmentPage> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.check_circle, size: 120, color: Colors.white),
+                const Icon(Icons.check_circle, size: 120, color: Colors.white),
                 const SizedBox(height: 32),
                 Text(
                   'System aligned. Please disconned device from antenna.',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -155,9 +155,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
           Text(
             'Signal Strength (RSL)',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
           ),
           const SizedBox(height: 8),
 
@@ -258,12 +258,12 @@ class _AlignmentPageState extends State<AlignmentPage> {
               _currentStep == AlignmentStep.azimuth
                   ? 'Step 1: Azimuth Alignment'
                   : _currentStep == AlignmentStep.elevation
-                  ? 'Step 2: Elevation Alignment'
-                  : 'All Alignments Complete',
+                      ? 'Step 2: Elevation Alignment'
+                      : 'All Alignments Complete',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.primary,
-              ),
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
             ),
             const SizedBox(height: 12),
 
@@ -305,8 +305,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
           color: isConfirmed
               ? Colors.green[600]!
               : isActive
-              ? Theme.of(context).colorScheme.primary
-              : Colors.grey[300]!,
+                  ? Theme.of(context).colorScheme.primary
+                  : Colors.grey[300]!,
           width: 2,
         ),
         borderRadius: BorderRadius.circular(10),
@@ -321,9 +321,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
               Text(
                 title,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
               ),
               const SizedBox(height: 4),
               RichText(
@@ -389,13 +389,14 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   FloatingActionButton.extended(
                     onPressed: _currentStep == AlignmentStep.azimuth
                         ? () => setState(() {
-                            if (_azimuthTurnsLeft > 0) _azimuthTurnsLeft--;
-                            _updateRSLBasedOnAlignment();
-                          })
+                              if (_azimuthTurnsLeft > 0) _azimuthTurnsLeft--;
+                              _updateRSLBasedOnAlignment();
+                            })
                         : () => setState(() {
-                            if (_elevationTurnsLeft > 0) _elevationTurnsLeft--;
-                            _updateRSLBasedOnAlignment();
-                          }),
+                              if (_elevationTurnsLeft > 0)
+                                _elevationTurnsLeft--;
+                              _updateRSLBasedOnAlignment();
+                            }),
                     backgroundColor: Colors.orange[600],
                     icon: const Icon(Icons.rotate_left),
                     label: const Text('Left'),
@@ -405,14 +406,15 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   FloatingActionButton.extended(
                     onPressed: _currentStep == AlignmentStep.azimuth
                         ? () => setState(() {
-                            if (_azimuthTurnsRight > 0) _azimuthTurnsRight--;
-                            _updateRSLBasedOnAlignment();
-                          })
+                              if (_azimuthTurnsRight > 0) _azimuthTurnsRight--;
+                              _updateRSLBasedOnAlignment();
+                            })
                         : () => setState(() {
-                            if (_elevationTurnsRight > 0)
-                              _elevationTurnsRight--;
-                            _updateRSLBasedOnAlignment();
-                          }),
+                              if (_elevationTurnsRight > 0) {
+                                _elevationTurnsRight--;
+                              }
+                              _updateRSLBasedOnAlignment();
+                            }),
                     backgroundColor: Colors.orange[600],
                     icon: const Icon(Icons.rotate_right),
                     label: const Text('Right'),
@@ -553,8 +555,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
 
   void _finalizeAlignment() {
     // Final check if both are aligned
-    bool isProperlyAligned =
-        (_azimuthTurnsLeft == 0 &&
+    bool isProperlyAligned = (_azimuthTurnsLeft == 0 &&
         _azimuthTurnsRight == 0 &&
         _elevationTurnsLeft == 0 &&
         _elevationTurnsRight == 0);
@@ -721,9 +722,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
-              final contact = userNumber.isEmpty
-                  ? '+1-800-555-1234'
-                  : userNumber;
+              final contact =
+                  userNumber.isEmpty ? '+1-800-555-1234' : userNumber;
               _showSupportInstructions(contact);
             },
             child: const Text('Request Call'),
@@ -746,7 +746,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           children: [
             const Text('Support placeholder instructions:'),
             const SizedBox(height: 8),
-            Text('Call: +1-800-555-1234'),
+            const Text('Call: +1-800-555-1234'),
             const SizedBox(height: 6),
             Text('When prompted, provide this callback number: $userNumber'),
             const SizedBox(height: 6),
