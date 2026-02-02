@@ -691,73 +691,36 @@ class _AlignmentPageState extends State<AlignmentPage> {
     );
   }
 
-  // Support helpline prompt: asks user for their number and shows placeholder instructions
+  // Support helpline prompt: displays the support phone number to call
   void _showSupportPrompt() {
-    String userNumber = '';
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         title: const Text('Support Helpline'),
-        content: StatefulBuilder(
-          builder: (context, setState) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Enter your phone number so support can call you back (optional):',
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(hintText: '+1 555 555 5555'),
-                onChanged: (v) => userNumber = v.trim(),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              final contact =
-                  userNumber.isEmpty ? '+1-800-555-1234' : userNumber;
-              _showSupportInstructions(contact);
-            },
-            child: const Text('Request Call'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Placeholder instructions for contacting support
-  void _showSupportInstructions(String userNumber) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text('Contacting Support'),
-        content: Column(
+        content: const Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Support placeholder instructions:'),
-            const SizedBox(height: 8),
-            const Text('Call: +1-800-555-1234'),
-            const SizedBox(height: 6),
-            Text('When prompted, provide this callback number: $userNumber'),
-            const SizedBox(height: 6),
-            const Text('Reference: Provide link ID and signal readings.'),
+            Text(
+              'Contact our support team at:',
+              style: TextStyle(fontSize: 16),
+            ),
+            SizedBox(height: 16),
+            Text(
+              '+1-800-555-1234',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF0D47A1),
+              ),
+            ),
           ],
         ),
         actions: [
-          TextButton(
+          ElevatedButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+            child: const Text('Close'),
           ),
         ],
       ),

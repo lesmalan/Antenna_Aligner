@@ -8,7 +8,6 @@ plugins {
 android {
     namespace = "com.example.sd2_losapp"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
