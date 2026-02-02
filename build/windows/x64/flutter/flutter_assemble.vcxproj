@@ -1,0 +1,232 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Profile|x64">
+      <Configuration>Profile</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{5C2040F8-E8DB-3AB8-A027-C0F8A28C60BF}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.22000.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>flutter_assemble</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\flutter_projects\sd2_losapp\build\windows\x64\CMakeFiles\e7a688995145c43ad9781a4e90f81321\flutter_windows.dll.rule">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/flutter_windows.dll, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/flutter_export.h, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/flutter_windows.h, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/flutter_messenger.h, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/flutter_plugin_registrar.h, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/flutter_texture_registrar.h, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/cpp_client_wrapper/core_implementations.cc, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/cpp_client_wrapper/standard_codec.cc, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/cpp_client_wrapper/plugin_registrar.cc, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/cpp_client_wrapper/flutter_engine.cc, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/cpp_client_wrapper/flutter_view_controller.cc, _phony_</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E env FLUTTER_ROOT=C:\Users\ladyb\develop\flutter PROJECT_DIR=C:\flutter_projects\sd2_losapp FLUTTER_ROOT=C:\Users\ladyb\develop\flutter FLUTTER_EPHEMERAL_DIR=C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral PROJECT_DIR=C:\flutter_projects\sd2_losapp FLUTTER_TARGET=C:\flutter_projects\sd2_losapp\lib\main.dart DART_DEFINES=RkxVVFRFUl9WRVJTSU9OPTMuMzguNw==,RkxVVFRFUl9DSEFOTkVMPXN0YWJsZQ==,RkxVVFRFUl9HSVRfVVJMPWh0dHBzOi8vZ2l0aHViLmNvbS9mbHV0dGVyL2ZsdXR0ZXIuZ2l0,RkxVVFRFUl9GUkFNRVdPUktfUkVWSVNJT049M2I2MmVmYzJhMw==,RkxVVFRFUl9FTkdJTkVfUkVWSVNJT049NzhmYzMwMTJlNA==,RkxVVFRFUl9EQVJUX1ZFUlNJT049My4xMC43 DART_OBFUSCATION=false TRACK_WIDGET_CREATION=true TREE_SHAKE_ICONS=false PACKAGE_CONFIG=C:\flutter_projects\sd2_losapp\.dart_tool\package_config.json C:/Users/ladyb/develop/flutter/packages/flutter_tools/bin/tool_backend.bat windows-x64 Debug
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_windows.dll;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_export.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_windows.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_messenger.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_plugin_registrar.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_texture_registrar.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\core_implementations.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\standard_codec.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\plugin_registrar.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\flutter_engine.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\flutter_view_controller.cc;C:\flutter_projects\sd2_losapp\build\windows\x64\flutter\_phony_</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</VerifyInputsAndOutputsExist>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Generating C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/flutter_windows.dll, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/flutter_export.h, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/flutter_windows.h, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/flutter_messenger.h, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/flutter_plugin_registrar.h, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/flutter_texture_registrar.h, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/cpp_client_wrapper/core_implementations.cc, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/cpp_client_wrapper/standard_codec.cc, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/cpp_client_wrapper/plugin_registrar.cc, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/cpp_client_wrapper/flutter_engine.cc, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/cpp_client_wrapper/flutter_view_controller.cc, _phony_</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">setlocal
+"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E env FLUTTER_ROOT=C:\Users\ladyb\develop\flutter PROJECT_DIR=C:\flutter_projects\sd2_losapp FLUTTER_ROOT=C:\Users\ladyb\develop\flutter FLUTTER_EPHEMERAL_DIR=C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral PROJECT_DIR=C:\flutter_projects\sd2_losapp FLUTTER_TARGET=C:\flutter_projects\sd2_losapp\lib\main.dart DART_DEFINES=RkxVVFRFUl9WRVJTSU9OPTMuMzguNw==,RkxVVFRFUl9DSEFOTkVMPXN0YWJsZQ==,RkxVVFRFUl9HSVRfVVJMPWh0dHBzOi8vZ2l0aHViLmNvbS9mbHV0dGVyL2ZsdXR0ZXIuZ2l0,RkxVVFRFUl9GUkFNRVdPUktfUkVWSVNJT049M2I2MmVmYzJhMw==,RkxVVFRFUl9FTkdJTkVfUkVWSVNJT049NzhmYzMwMTJlNA==,RkxVVFRFUl9EQVJUX1ZFUlNJT049My4xMC43 DART_OBFUSCATION=false TRACK_WIDGET_CREATION=true TREE_SHAKE_ICONS=false PACKAGE_CONFIG=C:\flutter_projects\sd2_losapp\.dart_tool\package_config.json C:/Users/ladyb/develop/flutter/packages/flutter_tools/bin/tool_backend.bat windows-x64 Profile
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_windows.dll;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_export.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_windows.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_messenger.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_plugin_registrar.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_texture_registrar.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\core_implementations.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\standard_codec.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\plugin_registrar.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\flutter_engine.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\flutter_view_controller.cc;C:\flutter_projects\sd2_losapp\build\windows\x64\flutter\_phony_</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">false</LinkObjects>
+      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">false</VerifyInputsAndOutputsExist>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Generating C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/flutter_windows.dll, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/flutter_export.h, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/flutter_windows.h, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/flutter_messenger.h, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/flutter_plugin_registrar.h, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/flutter_texture_registrar.h, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/cpp_client_wrapper/core_implementations.cc, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/cpp_client_wrapper/standard_codec.cc, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/cpp_client_wrapper/plugin_registrar.cc, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/cpp_client_wrapper/flutter_engine.cc, C:/flutter_projects/sd2_losapp/windows/flutter/ephemeral/cpp_client_wrapper/flutter_view_controller.cc, _phony_</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E env FLUTTER_ROOT=C:\Users\ladyb\develop\flutter PROJECT_DIR=C:\flutter_projects\sd2_losapp FLUTTER_ROOT=C:\Users\ladyb\develop\flutter FLUTTER_EPHEMERAL_DIR=C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral PROJECT_DIR=C:\flutter_projects\sd2_losapp FLUTTER_TARGET=C:\flutter_projects\sd2_losapp\lib\main.dart DART_DEFINES=RkxVVFRFUl9WRVJTSU9OPTMuMzguNw==,RkxVVFRFUl9DSEFOTkVMPXN0YWJsZQ==,RkxVVFRFUl9HSVRfVVJMPWh0dHBzOi8vZ2l0aHViLmNvbS9mbHV0dGVyL2ZsdXR0ZXIuZ2l0,RkxVVFRFUl9GUkFNRVdPUktfUkVWSVNJT049M2I2MmVmYzJhMw==,RkxVVFRFUl9FTkdJTkVfUkVWSVNJT049NzhmYzMwMTJlNA==,RkxVVFRFUl9EQVJUX1ZFUlNJT049My4xMC43 DART_OBFUSCATION=false TRACK_WIDGET_CREATION=true TREE_SHAKE_ICONS=false PACKAGE_CONFIG=C:\flutter_projects\sd2_losapp\.dart_tool\package_config.json C:/Users/ladyb/develop/flutter/packages/flutter_tools/bin/tool_backend.bat windows-x64 Release
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_windows.dll;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_export.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_windows.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_messenger.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_plugin_registrar.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_texture_registrar.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\core_implementations.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\standard_codec.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\plugin_registrar.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\flutter_engine.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\flutter_view_controller.cc;C:\flutter_projects\sd2_losapp\build\windows\x64\flutter\_phony_</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</VerifyInputsAndOutputsExist>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\flutter_projects\sd2_losapp\build\windows\x64\CMakeFiles\7aae3c83edd3443b31c9887786c34bd0\flutter_assemble.rule">
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'"></Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_windows.dll;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_export.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_windows.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_messenger.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_plugin_registrar.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_texture_registrar.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\core_implementations.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\standard_codec.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\plugin_registrar.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\flutter_engine.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\flutter_view_controller.cc;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\flutter_projects\sd2_losapp\build\windows\x64\flutter\CMakeFiles\flutter_assemble</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</VerifyInputsAndOutputsExist>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Profile|x64'"></Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">setlocal
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_windows.dll;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_export.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_windows.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_messenger.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_plugin_registrar.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_texture_registrar.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\core_implementations.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\standard_codec.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\plugin_registrar.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\flutter_engine.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\flutter_view_controller.cc;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">C:\flutter_projects\sd2_losapp\build\windows\x64\flutter\CMakeFiles\flutter_assemble</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">false</LinkObjects>
+      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">false</VerifyInputsAndOutputsExist>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'"></Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_windows.dll;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_export.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_windows.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_messenger.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_plugin_registrar.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\flutter_texture_registrar.h;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\core_implementations.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\standard_codec.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\plugin_registrar.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\flutter_engine.cc;C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\cpp_client_wrapper\flutter_view_controller.cc;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\flutter_projects\sd2_losapp\build\windows\x64\flutter\CMakeFiles\flutter_assemble</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <VerifyInputsAndOutputsExist Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</VerifyInputsAndOutputsExist>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <CustomBuild Include="C:\flutter_projects\sd2_losapp\windows\flutter\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule C:/flutter_projects/sd2_losapp/windows/flutter/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SC:/flutter_projects/sd2_losapp/windows -BC:/flutter_projects/sd2_losapp/build/windows/x64 --check-stamp-file C:/flutter_projects/sd2_losapp/build/windows/x64/flutter/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\generated_config.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\flutter_projects\sd2_losapp\build\windows\x64\flutter\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Building Custom Rule C:/flutter_projects/sd2_losapp/windows/flutter/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">setlocal
+"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SC:/flutter_projects/sd2_losapp/windows -BC:/flutter_projects/sd2_losapp/build/windows/x64 --check-stamp-file C:/flutter_projects/sd2_losapp/build/windows/x64/flutter/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\generated_config.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">C:\flutter_projects\sd2_losapp\build\windows\x64\flutter\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule C:/flutter_projects/sd2_losapp/windows/flutter/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+"C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -SC:/flutter_projects/sd2_losapp/windows -BC:/flutter_projects/sd2_losapp/build/windows/x64 --check-stamp-file C:/flutter_projects/sd2_losapp/build/windows/x64/flutter/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\flutter_projects\sd2_losapp\windows\flutter\ephemeral\generated_config.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\flutter_projects\sd2_losapp\build\windows\x64\flutter\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="C:\flutter_projects\sd2_losapp\build\windows\x64\flutter\CMakeFiles\flutter_assemble">
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="C:\flutter_projects\sd2_losapp\build\windows\x64\ZERO_CHECK.vcxproj">
+      <Project>{B727825A-5C7B-3A16-92B7-E59DED7DF408}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

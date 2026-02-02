@@ -393,8 +393,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
                               _updateRSLBasedOnAlignment();
                             })
                         : () => setState(() {
-                              if (_elevationTurnsLeft > 0)
+                              if (_elevationTurnsLeft > 0) {
                                 _elevationTurnsLeft--;
+                              }
                               _updateRSLBasedOnAlignment();
                             }),
                     backgroundColor: Colors.orange[600],

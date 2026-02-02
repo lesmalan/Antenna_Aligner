@@ -1,0 +1,13 @@
+C:/flutter_projects/sd2_losapp/build/windows/x64/runner/Debug/data/icudtl.dat
+C:/flutter_projects/sd2_losapp/build/windows/x64/runner/Debug/flutter_windows.dll
+C:/flutter_projects/sd2_losapp/build/windows/x64/runner/Debug/data/flutter_assets/AssetManifest.bin
+C:/flutter_projects/sd2_losapp/build/windows/x64/runner/Debug/data/flutter_assets/AssetManifest.bin.json
+C:/flutter_projects/sd2_losapp/build/windows/x64/runner/Debug/data/flutter_assets/FontManifest.json
+C:/flutter_projects/sd2_losapp/build/windows/x64/runner/Debug/data/flutter_assets/fonts/MaterialIcons-Regular.otf
+C:/flutter_projects/sd2_losapp/build/windows/x64/runner/Debug/data/flutter_assets/kernel_blob.bin
+C:/flutter_projects/sd2_losapp/build/windows/x64/runner/Debug/data/flutter_assets/NativeAssetsManifest.json
+C:/flutter_projects/sd2_losapp/build/windows/x64/runner/Debug/data/flutter_assets/NOTICES
+C:/flutter_projects/sd2_losapp/build/windows/x64/runner/Debug/data/flutter_assets/NOTICES.Z
+C:/flutter_projects/sd2_losapp/build/windows/x64/runner/Debug/data/flutter_assets/packages/cupertino_icons/assets/CupertinoIcons.ttf
+C:/flutter_projects/sd2_losapp/build/windows/x64/runner/Debug/data/flutter_assets/shaders/ink_sparkle.frag
+C:/flutter_projects/sd2_losapp/build/windows/x64/runner/Debug/data/flutter_assets/shaders/stretch_effect.frag
