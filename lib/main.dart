@@ -13,7 +13,7 @@ enum AzimuthPhase {
   waitingForConnection,
   sweepInProgress,
   sweepComplete,
-  aligned
+  aligned,
 }
 
 enum ElevationPhase { waitingForStart, sweepInProgress, sweepComplete, aligned }
@@ -23,7 +23,7 @@ enum OverrideView {
   azimuthSweep,
   elevationSweep,
   alignment,
-  completed
+  completed,
 }
 
 class MyApp extends StatelessWidget {
@@ -276,12 +276,12 @@ class _AlignmentPageState extends State<AlignmentPage> {
   }
 
   List<OverrideView> get _overrideOrder => const [
-        OverrideView.connection,
-        OverrideView.azimuthSweep,
-        OverrideView.elevationSweep,
-        OverrideView.alignment,
-        OverrideView.completed,
-      ];
+    OverrideView.connection,
+    OverrideView.azimuthSweep,
+    OverrideView.elevationSweep,
+    OverrideView.alignment,
+    OverrideView.completed,
+  ];
 
   void _goToNextOverrideStep() {
     final currentIndex = _overrideOrder.indexOf(_overrideView);
@@ -313,8 +313,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   iconSize: 20,
                   padding: const EdgeInsets.all(4),
                   tooltip: 'Previous Step',
-                  onPressed:
-                      currentIndex > 0 ? _goToPreviousOverrideStep : null,
+                  onPressed: currentIndex > 0
+                      ? _goToPreviousOverrideStep
+                      : null,
                   icon: const Icon(Icons.chevron_left),
                 ),
                 Flexible(
@@ -323,10 +324,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
                     textAlign: TextAlign.center,
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
-                    style: Theme.of(context)
-                        .textTheme
-                        .labelLarge
-                        ?.copyWith(fontWeight: FontWeight.w600),
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 IconButton(
@@ -396,8 +396,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
             const Divider(),
             ListTile(
               leading: Icon(_overrideMode ? Icons.stop_circle : Icons.tune),
-              title:
-                  Text(_overrideMode ? 'Disable Override' : 'Enable Override'),
+              title: Text(
+                _overrideMode ? 'Disable Override' : 'Enable Override',
+              ),
               onTap: () {
                 Navigator.pop(context);
                 if (_overrideMode) {
@@ -452,24 +453,24 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 Text(
                   'Connecting to Raspberry Pi',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   'IP: 192.168.8.1:8000',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white70,
-                      ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
                 ),
                 const SizedBox(height: 16),
                 Text(
                   _connectionStatus,
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.white60,
-                        fontStyle: FontStyle.italic,
-                      ),
+                    color: Colors.white60,
+                    fontStyle: FontStyle.italic,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
@@ -477,7 +478,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   onPressed: _showOverrideMenu,
                   icon: Icon(_overrideMode ? Icons.tune : Icons.tune_outlined),
                   label: Text(
-                      _overrideMode ? 'Override Menu' : 'Override / Demo Mode'),
+                    _overrideMode ? 'Override Menu' : 'Override / Demo Mode',
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: Theme.of(context).colorScheme.primary,
@@ -534,9 +536,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 Text(
                   'System aligned. Please disconnect device from antenna.',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -584,23 +586,46 @@ class _AlignmentPageState extends State<AlignmentPage> {
         ],
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            // Signal Graph Section
-            Expanded(flex: 2, child: _buildSignalGraphSection()),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: constraints.maxHeight,
+                  maxWidth: 800,
+                ),
+                child: Center(
+                  child: SizedBox(
+                    width: constraints.maxWidth > 800
+                        ? 800
+                        : constraints.maxWidth,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Signal Graph Section
+                        SizedBox(
+                          height: 300,
+                          child: _buildSignalGraphSection(),
+                        ),
 
-            // Divider
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Divider(thickness: 2),
-            ),
+                        // Divider
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 16),
+                          child: Divider(thickness: 2),
+                        ),
 
-            // Alignment Information Section
-            Expanded(flex: 1, child: _buildAlignmentInfoSection()),
+                        // Alignment Information Section
+                        _buildAlignmentInfoSection(),
 
-            // Control Buttons Section
-            Expanded(flex: 1, child: _buildControlButtonsSection()),
-          ],
+                        // Control Buttons Section
+                        _buildControlButtonsSection(),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
         ),
       ),
       bottomNavigationBar: _overrideMode ? _buildDebugNavBar() : null,
@@ -618,158 +643,164 @@ class _AlignmentPageState extends State<AlignmentPage> {
         ),
         bottomNavigationBar: _overrideMode ? _buildDebugNavBar() : null,
         body: SafeArea(
-          child: Column(
-            children: [
-              // Instructions
-              Expanded(
-                flex: 1,
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  color: Colors.blue[50],
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.info, size: 48, color: Colors.blue),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Azimuth Sweep in Progress',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Rotate the antenna from left to right. The app is collecting signal strength data.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.black54,
-                            ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              // Real-time signal graph
-              Expanded(
-                flex: 2,
-                child: _buildSignalGraphSection(),
-              ),
-              // Sweep data info
-              Expanded(
-                flex: 1,
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  color: Colors.grey[100],
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          child: SingleChildScrollView(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Instructions
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      color: Colors.blue[50],
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Column(
+                          const Icon(Icons.info, size: 40, color: Colors.blue),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Azimuth Sweep in Progress',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Rotate the antenna from left to right. The app is collecting signal strength data.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: Colors.black54),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Real-time signal graph
+                    SizedBox(height: 250, child: _buildSignalGraphSection()),
+                    // Sweep data info
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      color: Colors.grey[100],
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Wrap(
+                            spacing: 24,
+                            runSpacing: 16,
+                            alignment: WrapAlignment.spaceEvenly,
                             children: [
-                              Text(
-                                'Data Points',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(color: Colors.grey[600]),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Data Points',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: Colors.grey[600]),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${_azimuthSweepRSLData.length}',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${_azimuthSweepRSLData.length}',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineSmall
-                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Max RSL Found',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: Colors.grey[600]),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${_azimuthMaxSweepRSL.toStringAsFixed(1)} dBm',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green[700],
+                                        ),
+                                  ),
+                                ],
+                              ),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Current RSL',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: Colors.grey[600]),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${_currentRSL.toStringAsFixed(1)} dBm',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                          Column(
+                          const SizedBox(height: 20),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            alignment: WrapAlignment.center,
                             children: [
-                              Text(
-                                'Max RSL Found',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(color: Colors.grey[600]),
+                              ElevatedButton.icon(
+                                onPressed: _takeAzimuthReading,
+                                icon: const Icon(Icons.camera_alt),
+                                label: const Text('Take Reading'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Theme.of(
+                                    context,
+                                  ).colorScheme.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 12,
+                                  ),
+                                ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${_azimuthMaxSweepRSL.toStringAsFixed(1)} dBm',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineSmall
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green[700],
-                                    ),
-                              ),
-                            ],
-                          ),
-                          Column(
-                            children: [
-                              Text(
-                                'Current RSL',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(color: Colors.grey[600]),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${_currentRSL.toStringAsFixed(1)} dBm',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineSmall
-                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              ElevatedButton.icon(
+                                onPressed: _completeSweep,
+                                icon: const Icon(Icons.check),
+                                label: const Text('Sweep Complete'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green[600],
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 12,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
                         ],
                       ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: Column(
-                          children: [
-                            ElevatedButton.icon(
-                              onPressed: _takeAzimuthReading,
-                              icon: const Icon(Icons.camera_alt),
-                              label: const Text('Take Reading'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    Theme.of(context).colorScheme.primary,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 32,
-                                  vertical: 16,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            ElevatedButton.icon(
-                              onPressed: _completeSweep,
-                              icon: const Icon(Icons.check),
-                              label: const Text('Sweep Complete'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green[600],
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 32,
-                                  vertical: 16,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       );
@@ -807,14 +838,15 @@ class _AlignmentPageState extends State<AlignmentPage> {
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.check_circle,
-                                    color: Colors.green, size: 24),
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: Colors.green,
+                                  size: 24,
+                                ),
                                 const SizedBox(width: 8),
                                 Text(
                                   'Sweep Complete',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium
+                                  style: Theme.of(context).textTheme.titleMedium
                                       ?.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: Colors.green[700],
@@ -825,9 +857,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                             const SizedBox(height: 16),
                             Text(
                               'Sweep Results:',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
+                              style: Theme.of(context).textTheme.titleSmall
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 8),
@@ -838,9 +868,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                             const SizedBox(height: 4),
                             Text(
                               'Maximum RSL found: ${_azimuthMaxSweepRSL.toStringAsFixed(1)} dBm',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
+                              style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(
                                     color: Colors.green[700],
                                     fontWeight: FontWeight.bold,
@@ -853,9 +881,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       // Input section
                       Text(
                         'How many turnbuckles were in your sweep?',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
+                        style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 16),
@@ -893,9 +919,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                             children: [
                               Text(
                                 'Alignment Instructions:',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleSmall
+                                style: Theme.of(context).textTheme.titleSmall
                                     ?.copyWith(fontWeight: FontWeight.bold),
                               ),
                               const SizedBox(height: 12),
@@ -906,9 +930,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                               const SizedBox(height: 8),
                               Text(
                                 'Maximum signal was at: ${_azimuthMaxSweepRSL.toStringAsFixed(1)} dBm',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
+                                style: Theme.of(context).textTheme.bodyMedium
                                     ?.copyWith(
                                       color: Colors.green[700],
                                       fontWeight: FontWeight.bold,
@@ -919,14 +941,16 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: Colors.orange[50],
-                                  border:
-                                      Border.all(color: Colors.orange[300]!),
+                                  border: Border.all(
+                                    color: Colors.orange[300]!,
+                                  ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: RichText(
                                   text: TextSpan(
-                                    style:
-                                        Theme.of(context).textTheme.bodyMedium,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
                                     children: [
                                       const TextSpan(
                                         text:
@@ -958,8 +982,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
                             icon: const Icon(Icons.done),
                             label: const Text('Confirm Alignment'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  Theme.of(context).colorScheme.primary,
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 32,
@@ -993,158 +1018,164 @@ class _AlignmentPageState extends State<AlignmentPage> {
         ),
         bottomNavigationBar: _overrideMode ? _buildDebugNavBar() : null,
         body: SafeArea(
-          child: Column(
-            children: [
-              // Instructions
-              Expanded(
-                flex: 1,
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  color: Colors.blue[50],
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.info, size: 48, color: Colors.blue),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Elevation Sweep in Progress',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87,
-                            ),
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Rotate the antenna from bottom to top. Click "Take Reading" at each position.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.black54,
-                            ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              // Real-time signal graph
-              Expanded(
-                flex: 2,
-                child: _buildSignalGraphSection(),
-              ),
-              // Sweep data info
-              Expanded(
-                flex: 1,
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  color: Colors.grey[100],
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          child: SingleChildScrollView(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Instructions
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      color: Colors.blue[50],
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Column(
+                          const Icon(Icons.info, size: 40, color: Colors.blue),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Elevation Sweep in Progress',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Rotate the antenna from bottom to top. Click "Take Reading" at each position.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: Colors.black54),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
+                      ),
+                    ),
+                    // Real-time signal graph
+                    SizedBox(height: 250, child: _buildSignalGraphSection()),
+                    // Sweep data info
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      color: Colors.grey[100],
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Wrap(
+                            spacing: 24,
+                            runSpacing: 16,
+                            alignment: WrapAlignment.spaceEvenly,
                             children: [
-                              Text(
-                                'Data Points',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(color: Colors.grey[600]),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Data Points',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: Colors.grey[600]),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${_elevationSweepRSLData.length}',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${_elevationSweepRSLData.length}',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineSmall
-                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Max RSL Found',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: Colors.grey[600]),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${_elevationMaxSweepRSL.toStringAsFixed(1)} dBm',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.green[700],
+                                        ),
+                                  ),
+                                ],
+                              ),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Current RSL',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: Colors.grey[600]),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${_currentRSL.toStringAsFixed(1)} dBm',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                          Column(
+                          const SizedBox(height: 20),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            alignment: WrapAlignment.center,
                             children: [
-                              Text(
-                                'Max RSL Found',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(color: Colors.grey[600]),
+                              ElevatedButton.icon(
+                                onPressed: _takeElevationReading,
+                                icon: const Icon(Icons.camera_alt),
+                                label: const Text('Take Reading'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Theme.of(
+                                    context,
+                                  ).colorScheme.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 12,
+                                  ),
+                                ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${_elevationMaxSweepRSL.toStringAsFixed(1)} dBm',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineSmall
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green[700],
-                                    ),
-                              ),
-                            ],
-                          ),
-                          Column(
-                            children: [
-                              Text(
-                                'Current RSL',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(color: Colors.grey[600]),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                '${_currentRSL.toStringAsFixed(1)} dBm',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineSmall
-                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              ElevatedButton.icon(
+                                onPressed: _completeElevationSweep,
+                                icon: const Icon(Icons.check),
+                                label: const Text('Sweep Complete'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.green[600],
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 12,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
                         ],
                       ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        child: Column(
-                          children: [
-                            ElevatedButton.icon(
-                              onPressed: _takeElevationReading,
-                              icon: const Icon(Icons.camera_alt),
-                              label: const Text('Take Reading'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor:
-                                    Theme.of(context).colorScheme.primary,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 32,
-                                  vertical: 16,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            ElevatedButton.icon(
-                              onPressed: _completeElevationSweep,
-                              icon: const Icon(Icons.check),
-                              label: const Text('Sweep Complete'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green[600],
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 32,
-                                  vertical: 16,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
         ),
       );
@@ -1182,14 +1213,15 @@ class _AlignmentPageState extends State<AlignmentPage> {
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.check_circle,
-                                    color: Colors.green, size: 24),
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: Colors.green,
+                                  size: 24,
+                                ),
                                 const SizedBox(width: 8),
                                 Text(
                                   'Sweep Complete',
-                                  style: Theme.of(context)
-                                      .textTheme
-                                      .titleMedium
+                                  style: Theme.of(context).textTheme.titleMedium
                                       ?.copyWith(
                                         fontWeight: FontWeight.bold,
                                         color: Colors.green[700],
@@ -1200,9 +1232,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                             const SizedBox(height: 16),
                             Text(
                               'Sweep Results:',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleSmall
+                              style: Theme.of(context).textTheme.titleSmall
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 8),
@@ -1213,9 +1243,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                             const SizedBox(height: 4),
                             Text(
                               'Maximum RSL found: ${_elevationMaxSweepRSL.toStringAsFixed(1)} dBm',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
+                              style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(
                                     color: Colors.green[700],
                                     fontWeight: FontWeight.bold,
@@ -1228,9 +1256,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       // Input section
                       Text(
                         'How many turnbuckles were in your sweep?',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleMedium
+                        style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 16),
@@ -1268,9 +1294,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                             children: [
                               Text(
                                 'Alignment Instructions:',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleSmall
+                                style: Theme.of(context).textTheme.titleSmall
                                     ?.copyWith(fontWeight: FontWeight.bold),
                               ),
                               const SizedBox(height: 12),
@@ -1281,9 +1305,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                               const SizedBox(height: 8),
                               Text(
                                 'Maximum signal was at: ${_elevationMaxSweepRSL.toStringAsFixed(1)} dBm',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodyMedium
+                                style: Theme.of(context).textTheme.bodyMedium
                                     ?.copyWith(
                                       color: Colors.green[700],
                                       fontWeight: FontWeight.bold,
@@ -1294,14 +1316,16 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: Colors.orange[50],
-                                  border:
-                                      Border.all(color: Colors.orange[300]!),
+                                  border: Border.all(
+                                    color: Colors.orange[300]!,
+                                  ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: RichText(
                                   text: TextSpan(
-                                    style:
-                                        Theme.of(context).textTheme.bodyMedium,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
                                     children: [
                                       const TextSpan(
                                         text:
@@ -1333,8 +1357,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
                             icon: const Icon(Icons.done),
                             label: const Text('Confirm Alignment'),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  Theme.of(context).colorScheme.primary,
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 32,
@@ -1368,9 +1393,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
           Text(
             'Signal Strength (RSL)',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
           ),
           const SizedBox(height: 8),
 
@@ -1469,12 +1494,12 @@ class _AlignmentPageState extends State<AlignmentPage> {
               _currentStep == AlignmentStep.azimuth
                   ? 'Step 1: Azimuth Alignment'
                   : _currentStep == AlignmentStep.elevation
-                      ? 'Step 2: Elevation Alignment'
-                      : 'All Alignments Complete',
+                  ? 'Step 2: Elevation Alignment'
+                  : 'All Alignments Complete',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+              ),
             ),
             const SizedBox(height: 12),
 
@@ -1516,8 +1541,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
           color: isConfirmed
               ? Colors.green[600]!
               : isActive
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.grey[300]!,
+              ? Theme.of(context).colorScheme.primary
+              : Colors.grey[300]!,
           width: 2,
         ),
         borderRadius: BorderRadius.circular(10),
@@ -1532,9 +1557,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
               Text(
                 title,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
               const SizedBox(height: 4),
               RichText(
@@ -1658,10 +1683,11 @@ class _AlignmentPageState extends State<AlignmentPage> {
       // The technician starts from the left and sweeps right
       // So turnbuckles from left = max index position relative to total sweep
       if (maxIndex >= 0) {
-        _azimuthTurnsToMaxRSL = (maxIndex /
-                _azimuthSweepRSLData.length *
-                _azimuthTurnbucklesInSweep)
-            .round();
+        _azimuthTurnsToMaxRSL =
+            (maxIndex /
+                    _azimuthSweepRSLData.length *
+                    _azimuthTurnbucklesInSweep)
+                .round();
       }
 
       setState(() {
@@ -1919,8 +1945,10 @@ class SineWavePainter extends CustomPainter {
     while (xLegend < legendX + 10) {
       canvas.drawLine(
         Offset(xLegend, legendY + legendItemHeight),
-        Offset((xLegend + legendDashWidth).clamp(legendX, legendX + 10),
-            legendY + legendItemHeight),
+        Offset(
+          (xLegend + legendDashWidth).clamp(legendX, legendX + 10),
+          legendY + legendItemHeight,
+        ),
         dashedLinePaint,
       );
       xLegend += legendDashWidth + legendDashSpace;
@@ -1938,7 +1966,9 @@ class SineWavePainter extends CustomPainter {
     );
     currentLabel.layout();
     currentLabel.paint(
-        canvas, const Offset(legendX + 14, legendY + legendItemHeight - 6));
+      canvas,
+      const Offset(legendX + 14, legendY + legendItemHeight - 6),
+    );
   }
 
   @override
