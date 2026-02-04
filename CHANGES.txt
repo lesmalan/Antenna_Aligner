@@ -1,0 +1,38 @@
+Changes to znle_pyvisa.py Script - 01/28/26
+==================================
+
+1. VNA Port Configuration
+   - Added CALC:PAR:PORT 1 command to explicitly set VNA to read from port 1
+
+2. Plotting Functionality
+   - Added matplotlib library for data visualization
+   - Added --plot command-line flag to enable graphing
+   - Plots display amplitude (dB) vs frequency (GHz)
+   - Graphs are saved as PNG files (e.g., trace_plot.png) in the working directory
+
+3. Time-Series Monitoring Mode
+   - Added --monitor flag for antenna alignment mode
+   - Plots amplitude vs time instead of frequency
+   - Takes repeated measurements over specified duration (default: 60 seconds)
+   - Monitors amplitude at a specific frequency or tracks maximum across sweep
+   - Added --monitor-freq flag (default: 1 GHz)
+   - Added --duration flag to set monitoring time (default: 60 seconds)
+   - Added --interval flag to set measurement interval (default: 1 second)
+
+4. Hardware Configuration Updates (01/28/26)
+   - Changed default frequency range to 900-1500 MHz (NanoVNA-H4 output range)
+   - Changed default measurement parameter from S21 to S11
+   - Updated for new receiver configuration: external signal feeds directly to ZNLE6 port 1
+   - New hardware: NanoVNA-H4 transmitter + RFSpace UWB antenna (900-12000 MHz)
+   - New receiver: Pasco WA-9800a connected directly to ZNLE6 port 1
+
+5. Usage Examples
+   - Single sweep with plot: python znle_pyvisa.py --plot
+   - Monitor at 1 GHz for 60 seconds: python znle_pyvisa.py --monitor --plot
+   - Monitor for 2 minutes: python znle_pyvisa.py --monitor --plot --duration 120
+   - Custom monitoring frequency: python znle_pyvisa.py --monitor --plot --monitor-freq 1.2e9
+   - Frequent measurements: python znle_pyvisa.py --monitor --plot --interval 0.5
+
+Dependencies Added:
+   - matplotlib (installed via pip)
+   - time, datetime (Python standard library)
