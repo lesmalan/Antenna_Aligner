@@ -255,8 +255,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
       ..clear()
       ..addAll(const [-95.0, -92.0, -90.5, -88.0, -86.0, -84.0, -83.0, -84.5]);
     _azimuthMaxSweepRSL = _azimuthSweepRSLData.reduce(max);
-    _azimuthTurnbucklesInSweep = 8;
-    _azimuthTurnsToMaxRSL = 5;
+    _azimuthTurnbucklesInSweep = 0;
+    _azimuthTurnsToMaxRSL = 0;
   }
 
   void _seedElevationDemoData() {
@@ -264,8 +264,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
       ..clear()
       ..addAll(const [-96.0, -94.0, -91.0, -89.5, -87.0, -85.0, -84.0, -83.5]);
     _elevationMaxSweepRSL = _elevationSweepRSLData.reduce(max);
-    _elevationTurnbucklesInSweep = 8;
-    _elevationTurnsFromTopToMax = 2;
+    _elevationTurnbucklesInSweep = 0;
+    _elevationTurnsFromTopToMax = 0;
   }
 
   void _disableOverride() {
@@ -273,6 +273,77 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _overrideMode = false;
       _overrideView = OverrideView.connection;
     });
+  }
+
+  List<OverrideView> get _overrideOrder => const [
+        OverrideView.connection,
+        OverrideView.azimuthSweep,
+        OverrideView.elevationSweep,
+        OverrideView.alignment,
+        OverrideView.completed,
+      ];
+
+  void _goToNextOverrideStep() {
+    final currentIndex = _overrideOrder.indexOf(_overrideView);
+    if (currentIndex < _overrideOrder.length - 1) {
+      _setOverrideView(_overrideOrder[currentIndex + 1]);
+    }
+  }
+
+  void _goToPreviousOverrideStep() {
+    final currentIndex = _overrideOrder.indexOf(_overrideView);
+    if (currentIndex > 0) {
+      _setOverrideView(_overrideOrder[currentIndex - 1]);
+    }
+  }
+
+  Widget _buildDebugNavBar() {
+    final currentIndex = _overrideOrder.indexOf(_overrideView);
+    return SafeArea(
+      top: false,
+      child: BottomAppBar(
+        color: Colors.grey[100],
+        child: SizedBox(
+          height: 44,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+            child: Row(
+              children: [
+                IconButton(
+                  iconSize: 20,
+                  padding: const EdgeInsets.all(4),
+                  tooltip: 'Previous Step',
+                  onPressed:
+                      currentIndex > 0 ? _goToPreviousOverrideStep : null,
+                  icon: const Icon(Icons.chevron_left),
+                ),
+                Flexible(
+                  child: Text(
+                    'Debug Step: ${_overrideView.name}',
+                    textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelLarge
+                        ?.copyWith(fontWeight: FontWeight.w600),
+                  ),
+                ),
+                IconButton(
+                  iconSize: 20,
+                  padding: const EdgeInsets.all(4),
+                  tooltip: 'Next Step',
+                  onPressed: currentIndex < _overrideOrder.length - 1
+                      ? _goToNextOverrideStep
+                      : null,
+                  icon: const Icon(Icons.chevron_right),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _showOverrideMenu() {
@@ -356,6 +427,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
     if ((!_isConnected && !_overrideMode) ||
         (_overrideMode && _overrideView == OverrideView.connection)) {
       return Scaffold(
+        bottomNavigationBar: _overrideMode ? _buildDebugNavBar() : null,
         body: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -441,6 +513,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
     // Show alignment screen (original flow)
     if (_processCompleted) {
       return Scaffold(
+        bottomNavigationBar: _overrideMode ? _buildDebugNavBar() : null,
         body: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -530,6 +603,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           ],
         ),
       ),
+      bottomNavigationBar: _overrideMode ? _buildDebugNavBar() : null,
     );
   }
 
@@ -542,6 +616,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           foregroundColor: Colors.white,
           actions: [_buildOverrideButton()],
         ),
+        bottomNavigationBar: _overrideMode ? _buildDebugNavBar() : null,
         body: SafeArea(
           child: Column(
             children: [
@@ -709,6 +784,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           foregroundColor: Colors.white,
           actions: [_buildOverrideButton()],
         ),
+        bottomNavigationBar: _overrideMode ? _buildDebugNavBar() : null,
         body: SafeArea(
           child: Column(
             children: [
@@ -915,6 +991,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           foregroundColor: Colors.white,
           actions: [_buildOverrideButton()],
         ),
+        bottomNavigationBar: _overrideMode ? _buildDebugNavBar() : null,
         body: SafeArea(
           child: Column(
             children: [
@@ -1082,6 +1159,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           foregroundColor: Colors.white,
           actions: [_buildOverrideButton()],
         ),
+        bottomNavigationBar: _overrideMode ? _buildDebugNavBar() : null,
         body: SafeArea(
           child: Column(
             children: [
