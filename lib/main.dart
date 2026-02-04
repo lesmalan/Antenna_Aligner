@@ -55,7 +55,7 @@ class AlignmentPage extends StatefulWidget {
 
 class _AlignmentPageState extends State<AlignmentPage> {
   // WebSocket connection for real-time data from Raspberry Pi
-  late WebSocketChannel _channel;
+  WebSocketChannel? _channel;
   bool _isConnected = false;
   String _connectionStatus = 'Connecting to Raspberry Pi...';
 
@@ -109,10 +109,10 @@ class _AlignmentPageState extends State<AlignmentPage> {
   void _connectWebSocket() {
     try {
       _channel = WebSocketChannel.connect(
-        Uri.parse('ws://192.168.8.1:8000/ws'),
+        Uri.parse('ws://192.168.15.92:8000/ws'),
       );
 
-      _channel.stream.listen(
+      _channel?.stream.listen(
         (message) {
           if (!mounted) return;
           try {
@@ -203,7 +203,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
 
   @override
   void dispose() {
-    _channel.sink.close();
+    _channel?.sink.close();
     super.dispose();
   }
 
@@ -459,7 +459,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'IP: 192.168.8.1:8000',
+                  'IP: 192.168.15.92:8000',
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(color: Colors.white70),

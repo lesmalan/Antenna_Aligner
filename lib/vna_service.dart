@@ -15,7 +15,7 @@ class VNAService {
         '/home/sd2-group2/Documents/SD2_Codespace/Antenna_Aligner/scripts/znle_pyvisa.py',
     this.csvDir =
         '/home/sd2-group2/Documents/SD2_Codespace/Antenna_Aligner/CSVs',
-    this.ip = '192.168.15.90',
+    this.ip = '192.168.15.92',
     this.port = '5025',
   });
 
