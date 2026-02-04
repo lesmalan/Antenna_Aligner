@@ -110,8 +110,16 @@ class _AlignmentPageState extends State<AlignmentPage> {
   void _connectWebSocket() {
     try {
       _channel = WebSocketChannel.connect(
-        Uri.parse('ws://192.168.15.92:8000/ws'),
+        Uri.parse('ws://192.168.15.192:8000/ws'),
       );
+
+      // Mark as connected once the stream is ready
+      setState(() {
+        _connectionStatus = 'Connected - waiting for data...';
+      });
+
+      // Send a request to prompt the server to start sending data
+      _channel?.sink.add(jsonEncode({'action': 'start', 'request': 'rsl'}));
 
       _channel?.stream.listen(
         (message) {
@@ -129,7 +137,10 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 _azimuthMaxSweepRSL = -100.0;
               }
 
-              _currentRSL = (data['rsl'] as num).toDouble();
+              // Update RSL if provided
+              if (data.containsKey('rsl')) {
+                _currentRSL = (data['rsl'] as num).toDouble();
+              }
 
               // If waiting for azimuth reading during sweep, capture it
               if (_waitingForAzimuthReading &&
@@ -460,7 +471,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'IP: 192.168.15.92:8000',
+                  'IP: 192.168.15.192:8000',
                   style: Theme.of(
                     context,
                   ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
