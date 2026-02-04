@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:math' show sin;
+import 'dart:math' show sin, max;
 import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -17,6 +17,14 @@ enum AzimuthPhase {
 }
 
 enum ElevationPhase { waitingForStart, sweepInProgress, sweepComplete, aligned }
+
+enum OverrideView {
+  connection,
+  azimuthSweep,
+  elevationSweep,
+  alignment,
+  completed
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -88,6 +96,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
   bool _elevationConfirmed = false;
   final int _currentSide = 1; // Track which side we're aligning (1 or 2)
   bool _processCompleted = false; // true when the entire process is finalized
+
+  bool _overrideMode = false;
+  OverrideView _overrideView = OverrideView.connection;
 
   @override
   void initState() {
@@ -196,10 +207,154 @@ class _AlignmentPageState extends State<AlignmentPage> {
     super.dispose();
   }
 
+  void _setOverrideView(OverrideView view) {
+    setState(() {
+      _overrideMode = true;
+      _overrideView = view;
+      _currentRSL = -85.0;
+
+      switch (view) {
+        case OverrideView.connection:
+          _azimuthPhase = AzimuthPhase.waitingForConnection;
+          _elevationPhase = ElevationPhase.waitingForStart;
+          _processCompleted = false;
+          _currentStep = AlignmentStep.azimuth;
+          break;
+        case OverrideView.azimuthSweep:
+          _azimuthPhase = AzimuthPhase.sweepInProgress;
+          _elevationPhase = ElevationPhase.waitingForStart;
+          _processCompleted = false;
+          _currentStep = AlignmentStep.azimuth;
+          _seedAzimuthDemoData();
+          break;
+        case OverrideView.elevationSweep:
+          _azimuthPhase = AzimuthPhase.aligned;
+          _elevationPhase = ElevationPhase.sweepInProgress;
+          _processCompleted = false;
+          _currentStep = AlignmentStep.elevation;
+          _seedElevationDemoData();
+          break;
+        case OverrideView.alignment:
+          _azimuthPhase = AzimuthPhase.aligned;
+          _elevationPhase = ElevationPhase.aligned;
+          _processCompleted = false;
+          _currentStep = AlignmentStep.azimuth;
+          break;
+        case OverrideView.completed:
+          _azimuthPhase = AzimuthPhase.aligned;
+          _elevationPhase = ElevationPhase.aligned;
+          _processCompleted = true;
+          _currentStep = AlignmentStep.finalized;
+          break;
+      }
+    });
+  }
+
+  void _seedAzimuthDemoData() {
+    _azimuthSweepRSLData
+      ..clear()
+      ..addAll(const [-95.0, -92.0, -90.5, -88.0, -86.0, -84.0, -83.0, -84.5]);
+    _azimuthMaxSweepRSL = _azimuthSweepRSLData.reduce(max);
+    _azimuthTurnbucklesInSweep = 8;
+    _azimuthTurnsToMaxRSL = 5;
+  }
+
+  void _seedElevationDemoData() {
+    _elevationSweepRSLData
+      ..clear()
+      ..addAll(const [-96.0, -94.0, -91.0, -89.5, -87.0, -85.0, -84.0, -83.5]);
+    _elevationMaxSweepRSL = _elevationSweepRSLData.reduce(max);
+    _elevationTurnbucklesInSweep = 8;
+    _elevationTurnsFromTopToMax = 2;
+  }
+
+  void _disableOverride() {
+    setState(() {
+      _overrideMode = false;
+      _overrideView = OverrideView.connection;
+    });
+  }
+
+  void _showOverrideMenu() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.link_off),
+              title: const Text('Connection Screen'),
+              onTap: () {
+                Navigator.pop(context);
+                _setOverrideView(OverrideView.connection);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.explore),
+              title: const Text('Azimuth Sweep'),
+              onTap: () {
+                Navigator.pop(context);
+                _setOverrideView(OverrideView.azimuthSweep);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.height),
+              title: const Text('Elevation Sweep'),
+              onTap: () {
+                Navigator.pop(context);
+                _setOverrideView(OverrideView.elevationSweep);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.dashboard),
+              title: const Text('Alignment Screen'),
+              onTap: () {
+                Navigator.pop(context);
+                _setOverrideView(OverrideView.alignment);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.check_circle),
+              title: const Text('Completed Screen'),
+              onTap: () {
+                Navigator.pop(context);
+                _setOverrideView(OverrideView.completed);
+              },
+            ),
+            const Divider(),
+            ListTile(
+              leading: Icon(_overrideMode ? Icons.stop_circle : Icons.tune),
+              title:
+                  Text(_overrideMode ? 'Disable Override' : 'Enable Override'),
+              onTap: () {
+                Navigator.pop(context);
+                if (_overrideMode) {
+                  _disableOverride();
+                } else {
+                  _setOverrideView(OverrideView.alignment);
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconButton _buildOverrideButton() {
+    return IconButton(
+      tooltip: _overrideMode ? 'Override Mode (On)' : 'Override Mode',
+      icon: Icon(_overrideMode ? Icons.tune : Icons.tune_outlined),
+      onPressed: _showOverrideMenu,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Show connection screen if not yet connected
-    if (!_isConnected) {
+    if ((!_isConnected && !_overrideMode) ||
+        (_overrideMode && _overrideView == OverrideView.connection)) {
       return Scaffold(
         body: Container(
           decoration: BoxDecoration(
@@ -245,11 +400,30 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       ),
                   textAlign: TextAlign.center,
                 ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: _showOverrideMenu,
+                  icon: Icon(_overrideMode ? Icons.tune : Icons.tune_outlined),
+                  label: Text(
+                      _overrideMode ? 'Override Menu' : 'Override / Demo Mode'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
               ],
             ),
           ),
         ),
       );
+    }
+
+    if (_overrideMode && _overrideView == OverrideView.azimuthSweep) {
+      return _buildAzimuthSweepScreen();
+    }
+
+    if (_overrideMode && _overrideView == OverrideView.elevationSweep) {
+      return _buildElevationSweepScreen();
     }
 
     // Show sweep phase screen
@@ -305,6 +479,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         actions: [
+          _buildOverrideButton(),
           // Connection status indicator
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -365,6 +540,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           title: const Text('Azimuth Sweep'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
+          actions: [_buildOverrideButton()],
         ),
         body: SafeArea(
           child: Column(
@@ -531,6 +707,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           title: const Text('Azimuth Alignment'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
+          actions: [_buildOverrideButton()],
         ),
         body: SafeArea(
           child: Column(
@@ -736,6 +913,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           title: const Text('Elevation Sweep'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
+          actions: [_buildOverrideButton()],
         ),
         body: SafeArea(
           child: Column(
@@ -902,6 +1080,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           title: const Text('Elevation Alignment'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
+          actions: [_buildOverrideButton()],
         ),
         body: SafeArea(
           child: Column(
@@ -1161,9 +1340,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           ),
           const SizedBox(height: 16),
 
-          // TODO: Implement actual signal graph using a charting library (e.g., fl_chart)
           // This should display a real-time graph of signal strength over time
-          // For now, showing a sine wave graph representation
           Expanded(
             child: Container(
               decoration: BoxDecoration(
