@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math' show sin;
+import 'dart:async';
+import 'vna_service.dart';
 
 void main() {
   runApp(const MyApp());
@@ -35,6 +37,13 @@ class AlignmentPage extends StatefulWidget {
 }
 
 class _AlignmentPageState extends State<AlignmentPage> {
+  final VNAService _vnaService = VNAService();
+  StreamSubscription<double>? _amplitudeSubscription;
+  
+  // VNA settings
+  double _monitorFrequency = 900e6; // 900 MHz default
+  String _sParameter = 'S11';
+  
   // TODO: Replace with actual data from LAN microwave signal source
   // This should fetch real RSL (Received Signal Level) data
   double _currentRSL = -85.5; // dBm
@@ -48,6 +57,54 @@ class _AlignmentPageState extends State<AlignmentPage> {
   bool _azimuthConfirmed = false;
   bool _elevationConfirmed = false;
   int _currentSide = 1; // Track which side we're aligning (1 or 2)
+  bool _isMonitoring = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Start monitoring VNA data
+    _startMonitoring();
+  }
+
+  @override
+  void dispose() {
+    _amplitudeSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _startMonitoring() {
+    if (_isMonitoring) return;
+    
+    setState(() => _isMonitoring = true);
+    
+    _amplitudeSubscription = _vnaService.monitorFrequency(
+      frequency: _monitorFrequency,
+      param: _sParameter,
+      interval: const Duration(seconds: 1),
+    ).listen((amplitude) {
+      setState(() {
+        _currentRSL = amplitude;
+        // Update max RSL if we see a higher value
+        if (amplitude > _maxRSL) {
+          _maxRSL = amplitude;
+        }
+      });
+    });
+  }
+
+  void _stopMonitoring() {
+    _amplitudeSubscription?.cancel();
+    _amplitudeSubscription = null;
+    setState(() => _isMonitoring = false);
+  }
+
+  void _changeFrequency(double newFrequency) {
+    _stopMonitoring();
+    setState(() {
+      _monitorFrequency = newFrequency;
+    });
+    _startMonitoring();
+  }
 
   void _updateRSLBasedOnAlignment() {
     // Calculate current RSL based on how aligned we are
