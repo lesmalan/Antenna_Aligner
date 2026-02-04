@@ -1,3 +1,4 @@
 {
-    "java.configuration.updateBuildConfiguration": "interactive"
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "cmake.sourceDirectory": "C:/Users/ladyb/OneDrive/SD1 - Team 2 Shared Folder/Spring Semester/Code/App Code/sd2_losapp/windows/flutter"
 }

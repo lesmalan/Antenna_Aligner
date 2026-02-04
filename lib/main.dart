@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math' show sin;
+import 'dart:convert';
+import 'package:web_socket_channel/web_socket_channel.dart';
 
 void main() {
   runApp(const MyApp());
@@ -35,8 +37,12 @@ class AlignmentPage extends StatefulWidget {
 }
 
 class _AlignmentPageState extends State<AlignmentPage> {
-  // TODO: Replace with actual data from LAN microwave signal source
-  // This should fetch real RSL (Received Signal Level) data
+  // WebSocket connection for real-time data from Raspberry Pi
+  late WebSocketChannel _channel;
+  bool _isConnected = false;
+  String _connectionStatus = 'Connecting to Raspberry Pi...';
+
+  // Signal data from Raspberry Pi
   double _currentRSL = -85.5; // dBm
   final double _maxRSL = -75.0; // dBm
   int _azimuthTurnsLeft = 3;
@@ -51,6 +57,78 @@ class _AlignmentPageState extends State<AlignmentPage> {
   bool _readyToFinalizeProcess =
       false; // true when side 2 is ready and user must press finalize
   bool _processCompleted = false; // true when the entire process is finalized
+
+  @override
+  void initState() {
+    super.initState();
+    _connectWebSocket();
+  }
+
+  void _connectWebSocket() {
+    try {
+      _channel = WebSocketChannel.connect(
+        Uri.parse('ws://192.168.8.1:8000/ws'),
+      );
+
+      _channel.stream.listen(
+        (message) {
+          if (!mounted) return;
+          try {
+            final data = jsonDecode(message);
+            setState(() {
+              _isConnected = true;
+              _connectionStatus = 'Connected';
+              _currentRSL = (data['rsl'] as num).toDouble();
+              // Optionally update turns if provided by server
+              if (data.containsKey('azimuth_turns_left')) {
+                _azimuthTurnsLeft = data['azimuth_turns_left'] as int;
+              }
+              if (data.containsKey('azimuth_turns_right')) {
+                _azimuthTurnsRight = data['azimuth_turns_right'] as int;
+              }
+              if (data.containsKey('elevation_turns_left')) {
+                _elevationTurnsLeft = data['elevation_turns_left'] as int;
+              }
+              if (data.containsKey('elevation_turns_right')) {
+                _elevationTurnsRight = data['elevation_turns_right'] as int;
+              }
+            });
+          } catch (e) {
+            debugPrint('Error parsing WebSocket data: $e');
+          }
+        },
+        onError: (error) {
+          if (mounted) {
+            setState(() {
+              _isConnected = false;
+              _connectionStatus = 'Connection error: $error';
+            });
+          }
+          debugPrint('WebSocket error: $error');
+        },
+        onDone: () {
+          if (mounted) {
+            setState(() {
+              _isConnected = false;
+              _connectionStatus = 'Connection closed';
+            });
+          }
+          // Attempt to reconnect after 3 seconds
+          Future.delayed(const Duration(seconds: 3), _connectWebSocket);
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isConnected = false;
+          _connectionStatus = 'Failed to connect: $e';
+        });
+      }
+      debugPrint('WebSocket connection error: $e');
+      // Attempt to reconnect after 3 seconds
+      Future.delayed(const Duration(seconds: 3), _connectWebSocket);
+    }
+  }
 
   void _updateRSLBasedOnAlignment() {
     // Calculate current RSL based on how aligned we are
@@ -69,6 +147,12 @@ class _AlignmentPageState extends State<AlignmentPage> {
 
     // Ensure RSL doesn't go below our minimum
     if (_currentRSL < -100) _currentRSL = -100;
+  }
+
+  @override
+  void dispose() {
+    _channel.sink.close();
+    super.dispose();
   }
 
   @override
@@ -94,7 +178,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 const Icon(Icons.check_circle, size: 120, color: Colors.white),
                 const SizedBox(height: 32),
                 Text(
-                  'System aligned. Please disconned device from antenna.',
+                  'System aligned. Please disconnect device from antenna.',
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
@@ -114,6 +198,29 @@ class _AlignmentPageState extends State<AlignmentPage> {
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         actions: [
+          // Connection status indicator
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Center(
+              child: Tooltip(
+                message: _connectionStatus,
+                child: Row(
+                  children: [
+                    Icon(
+                      _isConnected ? Icons.cloud_done : Icons.cloud_off,
+                      color: _isConnected ? Colors.green[300] : Colors.red[300],
+                      size: 20,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _isConnected ? 'Connected' : 'Offline',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
           IconButton(
             tooltip: 'Support Helpline',
             icon: const Icon(Icons.phone_in_talk),
@@ -373,57 +480,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            // Turnbuckle Controls (for testing/simulation)
-            if (_currentStep != AlignmentStep.finalized) ...[
-              Text(
-                'Test Controls: Adjust ${_currentStep == AlignmentStep.azimuth ? 'Azimuth' : 'Elevation'}',
-                style: Theme.of(
-                  context,
-                ).textTheme.labelSmall?.copyWith(color: Colors.grey[600]),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Turn Left Button
-                  FloatingActionButton.extended(
-                    onPressed: _currentStep == AlignmentStep.azimuth
-                        ? () => setState(() {
-                              if (_azimuthTurnsLeft > 0) _azimuthTurnsLeft--;
-                              _updateRSLBasedOnAlignment();
-                            })
-                        : () => setState(() {
-                              if (_elevationTurnsLeft > 0) {
-                                _elevationTurnsLeft--;
-                              }
-                              _updateRSLBasedOnAlignment();
-                            }),
-                    backgroundColor: Colors.orange[600],
-                    icon: const Icon(Icons.rotate_left),
-                    label: const Text('Left'),
-                  ),
-                  const SizedBox(width: 16),
-                  // Turn Right Button
-                  FloatingActionButton.extended(
-                    onPressed: _currentStep == AlignmentStep.azimuth
-                        ? () => setState(() {
-                              if (_azimuthTurnsRight > 0) _azimuthTurnsRight--;
-                              _updateRSLBasedOnAlignment();
-                            })
-                        : () => setState(() {
-                              if (_elevationTurnsRight > 0) {
-                                _elevationTurnsRight--;
-                              }
-                              _updateRSLBasedOnAlignment();
-                            }),
-                    backgroundColor: Colors.orange[600],
-                    icon: const Icon(Icons.rotate_right),
-                    label: const Text('Right'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-            ],
             // Main confirmation/control buttons
             if (_currentStep != AlignmentStep.finalized)
               ElevatedButton.icon(
@@ -760,27 +816,53 @@ class SineWavePainter extends CustomPainter {
       canvas.drawLine(Offset(0, i), Offset(size.width, i), gridPaint);
     }
 
-    // Draw center line (0 dBm reference)
-    final centerY = size.height / 2;
-    canvas.drawLine(
-      Offset(0, centerY),
-      Offset(size.width, centerY),
-      Paint()
-        ..color = Colors.grey[400]!
-        ..strokeWidth = 1,
+    // Draw Y-axis labels for RSL values
+    final labelPaint = TextPainter(
+      textDirection: TextDirection.ltr,
     );
 
-    // Create sine wave path
+    // Draw max RSL line
+    final maxY = size.height * 0.1;
+    canvas.drawLine(
+      Offset(0, maxY),
+      Offset(size.width, maxY),
+      Paint()
+        ..color = Colors.green[400]!
+        ..strokeWidth = 2
+        ..style = PaintingStyle.stroke,
+    );
+
+    // Draw current RSL level line
+    final rslRange = maxRSL - (-100.0);
+    final currentRSLNormalized = (maxRSL - currentRSL) / rslRange;
+    final currentY =
+        size.height * 0.1 + (currentRSLNormalized * (size.height * 0.8));
+
+    canvas.drawLine(
+      Offset(0, currentY),
+      Offset(size.width, currentY),
+      Paint()
+        ..color = Colors.red[600]!
+        ..strokeWidth = 2.5
+        ..style = PaintingStyle.stroke
+        ..strokeDashPattern = [5, 5],
+    );
+
+    // Create adaptive sine wave based on actual RSL
     final path = Path();
-    final amplitude = size.height * 0.35;
+    final baseAmplitude = size.height * 0.25;
     const frequency = 0.02;
 
     for (double x = 0; x < size.width; x++) {
-      // Add variation to simulate signal strength changes
+      // Normalize RSL: 0 = worst (-100 dBm), 1 = best (maxRSL)
+      final rslFactor = (maxRSL - currentRSL) / rslRange;
+
+      // Wave amplitude decreases as signal improves (more stable signal = flatter line)
+      final amplitude = baseAmplitude * (rslFactor * 0.7 + 0.1);
+
+      // Oscillate around the current RSL line
       final baseWave = amplitude * sin(x * frequency);
-      // Modulate amplitude based on current RSL (closer to max = higher amplitude)
-      final rslFactor = ((maxRSL - currentRSL) / (maxRSL - (-100))) * 0.5 + 0.5;
-      final y = centerY - (baseWave * rslFactor);
+      final y = currentY + baseWave;
 
       if (x == 0) {
         path.moveTo(x, y);
@@ -796,26 +878,59 @@ class SineWavePainter extends CustomPainter {
     fillPath.close();
     canvas.drawPath(fillPath, fillPaint);
 
-    // Draw the sine wave line
+    // Draw the signal waveform
     canvas.drawPath(path, paint);
 
-    // Draw current signal level marker
-    final currentX = size.width * 0.85;
-    final currentY = centerY - (amplitude * sin(currentX * frequency) * 0.5);
+    // Draw legend
+    final legendX = 12.0;
+    final legendY = 8.0;
+    const legendItemHeight = 16.0;
 
-    canvas.drawCircle(
-      Offset(currentX, currentY),
-      6,
-      Paint()..color = Colors.red[600]!,
-    );
-    canvas.drawCircle(
-      Offset(currentX, currentY),
-      8,
+    // Green line legend (Max RSL)
+    canvas.drawLine(
+      Offset(legendX, legendY),
+      Offset(legendX + 10, legendY),
       Paint()
-        ..color = Colors.red[600]!
-        ..style = PaintingStyle.stroke
+        ..color = Colors.green[400]!
         ..strokeWidth = 2,
     );
+    final maxLabel = TextPainter(
+      text: TextSpan(
+        text: 'Max: ${maxRSL.toStringAsFixed(1)} dBm',
+        style: const TextStyle(
+          color: Colors.black87,
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    maxLabel.layout();
+    maxLabel.paint(canvas, Offset(legendX + 14, legendY - 6));
+
+    // Red dashed line legend (Current RSL)
+    canvas.drawLine(
+      Offset(legendX, legendY + legendItemHeight),
+      Offset(legendX + 10, legendY + legendItemHeight),
+      Paint()
+        ..color = Colors.red[600]!
+        ..strokeWidth = 2
+        ..strokeDashPattern = [3, 3],
+    );
+    final currentLabel = TextPainter(
+      text: TextSpan(
+        text: 'Current: ${currentRSL.toStringAsFixed(1)} dBm',
+        style: const TextStyle(
+          color: Colors.black87,
+          fontSize: 10,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    currentLabel.layout();
+    currentLabel.paint(
+        canvas, Offset(legendX + 14, legendY + legendItemHeight - 6));
   }
 
   @override
