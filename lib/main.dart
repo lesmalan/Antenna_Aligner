@@ -94,7 +94,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
   AlignmentStep _currentStep = AlignmentStep.azimuth;
   bool _azimuthConfirmed = false;
   bool _elevationConfirmed = false;
-  final int _currentSide = 1; // Track which side we're aligning (1 or 2)
+  int _currentSide = 1; // Track which side we're aligning (1 or 2)
+  bool _side1Complete = false; // Track if side 1 alignment is done
   bool _processCompleted = false; // true when the entire process is finalized
 
   bool _overrideMode = false;
@@ -534,11 +535,19 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 const Icon(Icons.check_circle, size: 120, color: Colors.white),
                 const SizedBox(height: 32),
                 Text(
-                  'System aligned. Please disconnect device from antenna.',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  'Both sides aligned successfully!',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                   ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Please disconnect device from antenna.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium?.copyWith(color: Colors.white70),
                   textAlign: TextAlign.center,
                 ),
               ],
@@ -636,7 +645,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
     if (_azimuthPhase == AzimuthPhase.sweepInProgress) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Azimuth Sweep'),
+          title: Text('Azimuth Sweep - Side $_currentSide'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
           actions: [_buildOverrideButton()],
@@ -650,6 +659,31 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Side 1 complete indicator (only show when on side 2)
+                    if (_side1Complete)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        color: Colors.green[100],
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              color: Colors.green[700],
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Side 1 Complete',
+                              style: TextStyle(
+                                color: Colors.green[700],
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     // Instructions
                     Container(
                       width: double.infinity,
@@ -661,7 +695,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                           const Icon(Icons.info, size: 40, color: Colors.blue),
                           const SizedBox(height: 12),
                           Text(
-                            'Azimuth Sweep in Progress',
+                            'Azimuth Sweep in Progress - Side $_currentSide',
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(
                                   fontWeight: FontWeight.bold,
@@ -810,7 +844,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
     if (_azimuthPhase == AzimuthPhase.sweepComplete) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Azimuth Alignment'),
+          title: Text('Azimuth Alignment - Side $_currentSide'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
           actions: [_buildOverrideButton()],
@@ -1011,7 +1045,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
     if (_elevationPhase == ElevationPhase.sweepInProgress) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Elevation Sweep'),
+          title: Text('Elevation Sweep - Side $_currentSide'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
           actions: [_buildOverrideButton()],
@@ -1025,6 +1059,31 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
+                    // Side 1 complete indicator (only show when on side 2)
+                    if (_side1Complete)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        color: Colors.green[100],
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              color: Colors.green[700],
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Side 1 Complete',
+                              style: TextStyle(
+                                color: Colors.green[700],
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     // Instructions
                     Container(
                       width: double.infinity,
@@ -1036,7 +1095,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                           const Icon(Icons.info, size: 40, color: Colors.blue),
                           const SizedBox(height: 12),
                           Text(
-                            'Elevation Sweep in Progress',
+                            'Elevation Sweep in Progress - Side $_currentSide',
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(
                                   fontWeight: FontWeight.bold,
@@ -1185,7 +1244,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
     if (_elevationPhase == ElevationPhase.sweepComplete) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Elevation Alignment'),
+          title: Text('Elevation Alignment - Side $_currentSide'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
           actions: [_buildOverrideButton()],
@@ -1727,21 +1786,65 @@ class _AlignmentPageState extends State<AlignmentPage> {
             (_elevationSweepRSLData.length - maxIndex - 1);
       }
 
-      setState(() {
-        _elevationPhase = ElevationPhase.aligned;
-        _elevationConfirmed = true;
-        _processCompleted = true;
-      });
+      if (_currentSide == 1) {
+        // Side 1 complete - proceed to side 2
+        setState(() {
+          _elevationPhase = ElevationPhase.aligned;
+          _elevationConfirmed = true;
+          _side1Complete = true;
+        });
 
-      _showConfirmationDialog(
-        title: 'Elevation Aligned',
-        message:
-            'Elevation alignment complete. From the TOP, go DOWN $_elevationTurnsFromTopToMax turnbuckles to reach maximum signal.\n\nAll alignments complete!',
-        onConfirm: () {
-          Navigator.pop(context);
-        },
-      );
+        _showConfirmationDialog(
+          title: 'Side 1 Complete',
+          message:
+              'Side 1 elevation alignment complete. From the TOP, go DOWN $_elevationTurnsFromTopToMax turnbuckles to reach maximum signal.\n\nNow proceeding to Side 2 alignment...',
+          onConfirm: () {
+            Navigator.pop(context);
+            _startSide2();
+          },
+        );
+      } else {
+        // Side 2 complete - all done
+        setState(() {
+          _elevationPhase = ElevationPhase.aligned;
+          _elevationConfirmed = true;
+          _processCompleted = true;
+        });
+
+        _showConfirmationDialog(
+          title: 'Side 2 Complete',
+          message:
+              'Side 2 elevation alignment complete. From the TOP, go DOWN $_elevationTurnsFromTopToMax turnbuckles to reach maximum signal.\n\nBoth sides are now aligned!',
+          onConfirm: () {
+            Navigator.pop(context);
+          },
+        );
+      }
     }
+  }
+
+  void _startSide2() {
+    setState(() {
+      _currentSide = 2;
+      // Reset azimuth state for side 2
+      _azimuthPhase = AzimuthPhase.sweepInProgress;
+      _azimuthSweepRSLData.clear();
+      _azimuthMaxSweepRSL = -100.0;
+      _azimuthTurnbucklesInSweep = 0;
+      _azimuthTurnsToMaxRSL = 0;
+      _azimuthConfirmed = false;
+      _waitingForAzimuthReading = false;
+      // Reset elevation state for side 2
+      _elevationPhase = ElevationPhase.waitingForStart;
+      _elevationSweepRSLData.clear();
+      _elevationMaxSweepRSL = -100.0;
+      _elevationTurnbucklesInSweep = 0;
+      _elevationTurnsFromTopToMax = 0;
+      _elevationConfirmed = false;
+      _waitingForElevationReading = false;
+      // Reset step
+      _currentStep = AlignmentStep.azimuth;
+    });
   }
 
   void _showConfirmationDialog({
