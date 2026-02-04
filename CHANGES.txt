@@ -36,3 +36,83 @@ Changes to znle_pyvisa.py Script - 01/28/26
 Dependencies Added:
    - matplotlib (installed via pip)
    - time, datetime (Python standard library)
+
+
+GUI Application for ZNLE6 Control - 02/04/26
+=========================================
+
+1. Created znle_gui.py - Graphical User Interface
+   - Built with tkinter for easy access to znle_pyvisa.py functionality
+   - Provides user-friendly interface for spectrum analyzer control
+   - Eliminates need for command-line arguments
+
+2. GUI Features - Connection Settings
+   - IP address and port configuration fields
+   - Default values match instrument settings (192.168.15.90:5025)
+
+3. GUI Features - Measurement Settings
+   - Start/Stop frequency input fields (in Hz)
+   - Number of sweep points configuration
+   - S-parameter selection dropdown (S11, S21, S12, S22)
+   - Optional sweep time setting
+
+4. GUI Features - Operating Modes
+   - "Run Frequency Mode" button: Single frequency sweep with amplitude plot
+   - "Run Monitor Mode" button: Time-series monitoring at specific frequency
+   - Monitor mode settings: frequency, duration (default 60s), interval (default 1s)
+   - Stop button to cancel running measurements
+
+5. GUI Features - User Interface
+   - Output file selection with browse dialog
+   - Real-time status display showing measurement progress
+   - Countdown timer for Monitor mode (MM:SS format)
+   - Thread-safe operation (GUI remains responsive during measurements)
+   - Detailed error reporting with command logging
+
+6. Desktop Integration
+   - Created ZNLE6_Controller.desktop file for desktop launcher
+   - Single-click access to GUI from desktop icon
+   - Configured to use virtual environment Python interpreter
+
+7. Environment Setup
+   - Configured Python virtual environment (.venv)
+   - Installed required dependencies: pyvisa, pyvisa-py, matplotlib
+   - Updated GUI and desktop launcher to use venv Python path
+
+8. File Organization
+   - Created CSVs subdirectory for data files
+   - Created Plots subdirectory for graph images
+   - Updated default output paths to use organized folder structure
+   - Both directories are created automatically if they don't exist
+
+9. Monitor Mode Plot Enhancements
+   - Calculate and display average amplitude over entire trace duration
+   - Fixed y-axis scaling to average ± 5 dB for consistent trace comparison
+   - Added average amplitude to plot title
+   - Enables side-by-side comparison of different alignment configurations
+
+10. GUI Refinements
+   - Increased window size to 750x750 for better visibility
+   - Fixed countdown timer display (changed to tk.Label for color support)
+   - Added force display updates to ensure timer refreshes properly
+   - Added debug logging for timer operation
+   - Enhanced error reporting with detailed command logging
+   - Redesigned output settings with separate directory pickers for CSVs and Plots
+   - Simplified filename input to prevent overwriting previous datasets
+   - Stop button available to cancel measurements in progress
+   - Auto-opens generated plot in default image viewer after measurement completes
+   - Real-time countdown timer (MM:SS format) during monitor mode
+   - Default monitor frequency set to 900 MHz (center of frequency range)
+
+11. Usage
+   - Launch from desktop: Double-click "ZNLE6 Controller" icon
+   - Launch from terminal: python3 znle_gui.py
+   - Configure settings in GUI fields
+   - Click mode button to start measurement
+   - View real-time progress in status window
+   - CSV files saved to: Antenna_Aligner/CSVs/
+   - Plot images saved to: Antenna_Aligner/Plots/
+
+Dependencies:
+   - tkinter (Python standard library)
+   - threading, subprocess, os (Python standard library)

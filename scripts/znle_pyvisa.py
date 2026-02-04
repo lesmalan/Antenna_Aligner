@@ -13,6 +13,7 @@ Requires:
 from __future__ import annotations
 import argparse
 import math
+import os
 import sys
 import time
 from datetime import datetime
@@ -41,13 +42,25 @@ def main() -> None:
     ap.add_argument("--points", default=201, type=int, help="Sweep points")
     ap.add_argument("--param", default="S11", help="Trace parameter (S11/S21/S12/S22)")
     ap.add_argument("--sweep-time", default=None, type=float, help="Sweep time in seconds (optional)")
-    ap.add_argument("--out", default="trace.csv", help="Output CSV path")
+    ap.add_argument("--out", default="../CSVs/trace.csv", help="Output CSV path")
     ap.add_argument("--plot", action="store_true", help="Display plot of amplitude vs frequency")
     ap.add_argument("--monitor", action="store_true", help="Monitor mode: plot amplitude vs time")
     ap.add_argument("--monitor-freq", default=float(1e9), type=float, help="Specific frequency to monitor (Hz), default: 1 GHz")
     ap.add_argument("--duration", default=60, type=float, help="Monitoring duration in seconds (default: 60)")
     ap.add_argument("--interval", default=1.0, type=float, help="Measurement interval in seconds (default: 1.0)")
     args = ap.parse_args()
+
+    # Create output directories if they don't exist
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    base_dir = os.path.dirname(script_dir)
+    csv_dir = os.path.join(base_dir, "CSVs")
+    plots_dir = os.path.join(base_dir, "Plots")
+    os.makedirs(csv_dir, exist_ok=True)
+    os.makedirs(plots_dir, exist_ok=True)
+    
+    # Ensure output file is in CSVs directory if not an absolute path
+    if not os.path.isabs(args.out):
+        args.out = os.path.join(csv_dir, os.path.basename(args.out))
 
     rm = visa.ResourceManager("@py")  # use pyvisa-py backend
     # Raw socket resource string; alternatively: f"TCPIP::{args.ip}::INSTR"
@@ -122,16 +135,28 @@ def main() -> None:
         
         # Plot time-series
         if args.plot:
-            plot_filename = args.out.rsplit('.', 1)[0] + '_plot.png'
+            plot_basename = os.path.basename(args.out).rsplit('.', 1)[0] + '_plot.png'
+            # Use PLOTS_DIR from environment if set (from GUI), otherwise use plots_dir
+            target_plots_dir = os.environ.get('PLOTS_DIR', plots_dir)
+            plot_filename = os.path.join(target_plots_dir, plot_basename)
+            
+            # Calculate average amplitude for consistent y-axis scaling
+            avg_amplitude = sum(amplitudes) / len(amplitudes) if amplitudes else 0
+            
             plt.figure(figsize=(10, 6))
             plt.plot(timestamps, amplitudes, linewidth=1.5, marker='o', markersize=3)
             plt.xlabel("Time (seconds)")
             plt.ylabel("Amplitude (dB)")
-            plt.title(f"{args.param} Amplitude vs Time")
+            plt.title(f"{args.param} Amplitude vs Time (Avg: {avg_amplitude:.2f} dB)")
+            
+            # Set y-axis limits to average ± 5 dB for consistent comparison
+            plt.ylim(avg_amplitude - 5, avg_amplitude + 5)
+            
             plt.grid(True, alpha=0.3)
             plt.tight_layout()
             plt.savefig(plot_filename, dpi=150)
             print(f"Saved plot to {plot_filename}")
+            print(f"Average amplitude: {avg_amplitude:.2f} dB")
     else:
         # Single sweep mode (original behavior)
         inst.write("INIT")
@@ -156,7 +181,10 @@ def main() -> None:
 
         # Plot if requested
         if args.plot:
-            plot_filename = args.out.rsplit('.', 1)[0] + '_plot.png'
+            plot_basename = os.path.basename(args.out).rsplit('.', 1)[0] + '_plot.png'
+            # Use PLOTS_DIR from environment if set (from GUI), otherwise use plots_dir
+            target_plots_dir = os.environ.get('PLOTS_DIR', plots_dir)
+            plot_filename = os.path.join(target_plots_dir, plot_basename)
             plt.figure(figsize=(10, 6))
             plt.plot([f / 1e9 for f in freqs], amps, linewidth=1.5)
             plt.xlabel("Frequency (GHz)")
