@@ -68,8 +68,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
       0; // User input: how many turnbuckles in azimuth sweep
   int _azimuthTurnsToMaxRSL =
       0; // Calculated: how many turns left to reach max RSL
-  bool _waitingForAzimuthReading =
-      false; // Flag: waiting for next reading to be captured
+  bool _isRecordingAzimuth = false; // Flag: continuously recording azimuth data
 
   // Elevation sweep data collection
   ElevationPhase _elevationPhase = ElevationPhase.waitingForStart;
@@ -80,8 +79,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
       0; // User input: how many turnbuckles in elevation sweep
   int _elevationTurnsFromTopToMax =
       0; // Calculated: how many turns down from top to reach max RSL
-  bool _waitingForElevationReading =
-      false; // Flag: waiting for next reading to be captured
+  bool _isRecordingElevation =
+      false; // Flag: continuously recording elevation data
 
   // Signal data from Raspberry Pi
   double _currentRSL = -85.5; // dBm
@@ -142,24 +141,22 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 _currentRSL = (data['rsl'] as num).toDouble();
               }
 
-              // If waiting for azimuth reading during sweep, capture it
-              if (_waitingForAzimuthReading &&
+              // If recording azimuth data during sweep, capture it continuously
+              if (_isRecordingAzimuth &&
                   _azimuthPhase == AzimuthPhase.sweepInProgress) {
                 _azimuthSweepRSLData.add(_currentRSL);
                 if (_currentRSL > _azimuthMaxSweepRSL) {
                   _azimuthMaxSweepRSL = _currentRSL;
                 }
-                _waitingForAzimuthReading = false;
               }
 
-              // If waiting for elevation reading during sweep, capture it
-              if (_waitingForElevationReading &&
+              // If recording elevation data during sweep, capture it continuously
+              if (_isRecordingElevation &&
                   _elevationPhase == ElevationPhase.sweepInProgress) {
                 _elevationSweepRSLData.add(_currentRSL);
                 if (_currentRSL > _elevationMaxSweepRSL) {
                   _elevationMaxSweepRSL = _currentRSL;
                 }
-                _waitingForElevationReading = false;
               }
 
               // Optionally update turns if provided by server
@@ -715,7 +712,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Rotate the antenna from left to right. The app is collecting signal strength data.',
+                            'Rotate the antenna from left to right. Press "Start Recording" to begin capturing data.',
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(color: Colors.black54),
                             textAlign: TextAlign.center,
@@ -810,13 +807,21 @@ class _AlignmentPageState extends State<AlignmentPage> {
                             alignment: WrapAlignment.center,
                             children: [
                               ElevatedButton.icon(
-                                onPressed: _takeAzimuthReading,
-                                icon: const Icon(Icons.camera_alt),
-                                label: const Text('Take Reading'),
+                                onPressed: _toggleAzimuthRecording,
+                                icon: Icon(
+                                  _isRecordingAzimuth
+                                      ? Icons.stop
+                                      : Icons.play_arrow,
+                                ),
+                                label: Text(
+                                  _isRecordingAzimuth
+                                      ? 'Stop Recording'
+                                      : 'Start Recording',
+                                ),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.primary,
+                                  backgroundColor: _isRecordingAzimuth
+                                      ? Colors.red[600]
+                                      : Theme.of(context).colorScheme.primary,
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 24,
@@ -1115,7 +1120,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            'Rotate the antenna from bottom to top. Click "Take Reading" at each position.',
+                            'Rotate the antenna from bottom to top. Press "Start Recording" to begin capturing data.',
                             style: Theme.of(context).textTheme.bodyMedium
                                 ?.copyWith(color: Colors.black54),
                             textAlign: TextAlign.center,
@@ -1210,13 +1215,21 @@ class _AlignmentPageState extends State<AlignmentPage> {
                             alignment: WrapAlignment.center,
                             children: [
                               ElevatedButton.icon(
-                                onPressed: _takeElevationReading,
-                                icon: const Icon(Icons.camera_alt),
-                                label: const Text('Take Reading'),
+                                onPressed: _toggleElevationRecording,
+                                icon: Icon(
+                                  _isRecordingElevation
+                                      ? Icons.stop
+                                      : Icons.play_arrow,
+                                ),
+                                label: Text(
+                                  _isRecordingElevation
+                                      ? 'Stop Recording'
+                                      : 'Start Recording',
+                                ),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Theme.of(
-                                    context,
-                                  ).colorScheme.primary,
+                                  backgroundColor: _isRecordingElevation
+                                      ? Colors.red[600]
+                                      : Theme.of(context).colorScheme.primary,
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 24,
@@ -1719,26 +1732,34 @@ class _AlignmentPageState extends State<AlignmentPage> {
     });
   }
 
-  void _takeAzimuthReading() {
+  void _toggleAzimuthRecording() {
     setState(() {
-      _waitingForAzimuthReading = true;
+      _isRecordingAzimuth = !_isRecordingAzimuth;
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Waiting for reading from Raspberry Pi...'),
-        duration: Duration(seconds: 3),
+      SnackBar(
+        content: Text(
+          _isRecordingAzimuth
+              ? 'Recording started - rotate the antenna slowly'
+              : 'Recording stopped',
+        ),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
 
-  void _takeElevationReading() {
+  void _toggleElevationRecording() {
     setState(() {
-      _waitingForElevationReading = true;
+      _isRecordingElevation = !_isRecordingElevation;
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Waiting for reading from Raspberry Pi...'),
-        duration: Duration(seconds: 3),
+      SnackBar(
+        content: Text(
+          _isRecordingElevation
+              ? 'Recording started - rotate the antenna slowly'
+              : 'Recording stopped',
+        ),
+        duration: const Duration(seconds: 2),
       ),
     );
   }
@@ -1844,7 +1865,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _azimuthTurnbucklesInSweep = 0;
       _azimuthTurnsToMaxRSL = 0;
       _azimuthConfirmed = false;
-      _waitingForAzimuthReading = false;
+      _isRecordingAzimuth = false;
       // Reset elevation state for side 2
       _elevationPhase = ElevationPhase.waitingForStart;
       _elevationSweepRSLData.clear();
@@ -1852,7 +1873,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _elevationTurnbucklesInSweep = 0;
       _elevationTurnsFromTopToMax = 0;
       _elevationConfirmed = false;
-      _waitingForElevationReading = false;
+      _isRecordingElevation = false;
       // Reset step
       _currentStep = AlignmentStep.azimuth;
     });
