@@ -3,16 +3,16 @@
 WebSocket server for Flutter app.
 
 Listens on 0.0.0.0:8000 and provides:
-- Real-time RSL (signal strength) data streaming
+- Real-time RSL (signal strength) data streaming from VNA
 - Command handling from Flutter client
 
-Requires: pip install websockets
+Requires: pip install websockets pyvisa pyvisa-py
 """
 import asyncio
 import json
 import random
 import time
-from typing import Set
+from typing import Optional, Set
 
 try:
     import websockets
@@ -22,8 +22,22 @@ except ImportError:
     print("Install with: pip install websockets")
     exit(1)
 
+try:
+    import pyvisa as visa
+except ImportError:
+    print("Warning: pyvisa not installed. Using simulated data.")
+    print("Install with: pip install pyvisa pyvisa-py")
+    visa = None
+
 # Connected WebSocket clients
 WS_CLIENTS: Set = set()
+
+# VNA connection settings
+VNA_IP = "192.168.15.90"
+VNA_PORT = 5025
+VNA_FREQ = 1e9  # 1 GHz
+VNA_PARAM = "S21"  # S-parameter to measure
+vna_instrument = None
 
 
 async def websocket_handler(websocket):
@@ -58,14 +72,77 @@ async def websocket_handler(websocket):
         print(f"Client disconnected: {websocket.remote_address}")
 
 
+def connect_vna() -> Optional:
+    """Connect to VNA instrument."""
+    global vna_instrument
+    if visa is None:
+        print("PyVISA not available, using simulated data")
+        return None
+    
+    try:
+        rm = visa.ResourceManager("@py")
+        resource = f"TCPIP0::{VNA_IP}::{VNA_PORT}::SOCKET"
+        inst = rm.open_resource(resource)
+        inst.timeout = 5000
+        inst.write_termination = "\n"
+        inst.read_termination = "\n"
+        
+        # Configure for single-point measurement
+        inst.write("FORM:DATA ASCii")
+        inst.write("CALC:PAR:PORT 1")
+        inst.write(f"CALC:PAR:DEF 'Trc1',{VNA_PARAM}")
+        inst.write("CALC:PAR:SEL 'Trc1'")
+        inst.write(f"SENS:FREQ:STAR {VNA_FREQ}")
+        inst.write(f"SENS:FREQ:STOP {VNA_FREQ}")
+        inst.write("SENSe:SWEep:POINts 1")
+        inst.write("CALC:FORM MLOG")  # log magnitude (dB)
+        inst.write("INIT:CONT OFF")
+        
+        idn = inst.query("*IDN?")
+        print(f"Connected to VNA: {idn.strip()}")
+        return inst
+    except Exception as e:
+        print(f"Failed to connect to VNA at {VNA_IP}:{VNA_PORT} - {e}")
+        print("Falling back to simulated data")
+        return None
+
+
+def get_vna_reading() -> float:
+    """Get single amplitude reading from VNA."""
+    global vna_instrument
+    
+    if vna_instrument is None:
+        # Simulated data
+        return -85.5 + random.uniform(-2, 2)
+    
+    try:
+        vna_instrument.write("INIT")
+        vna_instrument.query("*OPC?")
+        data_str = vna_instrument.query("CALC:DATA? FDATA")
+        amplitude = float(data_str.strip().split(",")[0])
+        return amplitude
+    except Exception as e:
+        print(f"Error reading from VNA: {e}")
+        # Return simulated value on error
+        return -85.5 + random.uniform(-2, 2)
+
+
 async def broadcast_signal_data():
-    """Broadcast simulated signal data to all connected clients."""
+    """Broadcast real VNA signal data to all connected clients."""
+    global vna_instrument
+    
+    # Connect to VNA
+    vna_instrument = connect_vna()
+    
     while True:
         if WS_CLIENTS:
-            # TODO: Replace with real VNA signal reading
+            # Get real or simulated RSL data
+            rsl_value = get_vna_reading()
+            
             data = {
-                "rsl": -85.5 + random.uniform(-2, 2),
-                "timestamp": time.time()
+                "rsl": rsl_value,
+                "timestamp": time.time(),
+                "source": "vna" if vna_instrument else "simulated"
             }
             
             # Broadcast to all clients
