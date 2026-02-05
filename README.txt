@@ -18,14 +18,14 @@ level, or RSL, of the signal is used to align the antennas.
 
 Deliverables:
 1)     Connection from SMA connector on antenna to spectrum analyzer. 
-2)     Device that gathers signal from spectrum analyzer, likely via USB.
+2)     Device that gathers signal from spectrum analyzer, likely via USB/Network.
 3)     Device must take data from spectrum analyzer and create an RSL meter/graph.
 4)     Device must connect to phone/tablet to display RSL data to tech. 
         Connection mode might be Bluetooth, peer-to-peer wifi, or cellular data.
 5)     App/browser page to display data to tech. 
 6)     Documentation for spectrum analyzer, device, and app/browser.
 7)     Test bed apparatus with fixed microwave transmitter, and a receiver 
-       that can be adjusted for azimuth and elevation by means of turnbuckles and lead screw.  
+       that can be adjusted for azimuth and elevation by means of turnbuckles and/or lead screw.  
 
 
 Design:
