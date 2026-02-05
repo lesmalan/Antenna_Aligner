@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=ZNLE6 Controller
+Comment=GUI for R&S ZNLE6 Spectrum Analyzer Control
+Exec=/home/sd2-group2/Documents/SD2_Codespace/Antenna_Aligner/.venv/bin/python /home/sd2-group2/Documents/SD2_Codespace/Antenna_Aligner/scripts/znle_gui.py
+Icon=applications-science
+Terminal=false
+Categories=Science;Education;
+StartupNotify=true
+Path=/home/sd2-group2/Documents/SD2_Codespace/Antenna_Aligner/scripts

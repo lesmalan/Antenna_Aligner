@@ -13,6 +13,7 @@ Requires:
 from __future__ import annotations
 import argparse
 import math
+import os
 import sys
 import time
 from datetime import datetime
@@ -30,7 +31,6 @@ try:
 except Exception as exc:
     print("Error: matplotlib not installed. pip install matplotlib", file=sys.stderr)
     raise
-
 
 def main() -> None:
     ap = argparse.ArgumentParser()
@@ -122,7 +122,13 @@ def main() -> None:
         
         # Plot time-series
         if args.plot:
-            plot_filename = args.out.rsplit('.', 1)[0] + '_plot.png'
+            # Use PLOTS_DIR environment variable if set (from GUI), otherwise save in same dir as CSV
+            base_name = os.path.basename(args.out).rsplit('.', 1)[0] + '_plot.png'
+            plots_dir = os.environ.get('PLOTS_DIR')
+            if plots_dir:
+                plot_filename = os.path.join(plots_dir, base_name)
+            else:
+                plot_filename = args.out.rsplit('.', 1)[0] + '_plot.png'
             plt.figure(figsize=(10, 6))
             plt.plot(timestamps, amplitudes, linewidth=1.5, marker='o', markersize=3)
             plt.xlabel("Time (seconds)")
@@ -156,7 +162,13 @@ def main() -> None:
 
         # Plot if requested
         if args.plot:
-            plot_filename = args.out.rsplit('.', 1)[0] + '_plot.png'
+            # Use PLOTS_DIR environment variable if set (from GUI), otherwise save in same dir as CSV
+            base_name = os.path.basename(args.out).rsplit('.', 1)[0] + '_plot.png'
+            plots_dir = os.environ.get('PLOTS_DIR')
+            if plots_dir:
+                plot_filename = os.path.join(plots_dir, base_name)
+            else:
+                plot_filename = args.out.rsplit('.', 1)[0] + '_plot.png'
             plt.figure(figsize=(10, 6))
             plt.plot([f / 1e9 for f in freqs], amps, linewidth=1.5)
             plt.xlabel("Frequency (GHz)")
