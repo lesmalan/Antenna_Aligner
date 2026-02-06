@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async' show TimeoutException;
 import 'dart:math' show sin, max;
 import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
@@ -99,18 +100,51 @@ class _AlignmentPageState extends State<AlignmentPage> {
 
   bool _overrideMode = false;
   OverrideView _overrideView = OverrideView.connection;
+  bool _isConnecting = false;
 
   @override
   void initState() {
     super.initState();
-    _connectWebSocket();
+    // Defer connection significantly to let the UI fully render first
+    // This prevents ANR (App Not Responding) issues on slow emulators
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) _connectWebSocket();
+    });
   }
 
-  void _connectWebSocket() {
+  Future<void> _connectWebSocket() async {
+    if (_isConnecting || !mounted) return;
+    _isConnecting = true;
+
     try {
-      _channel = WebSocketChannel.connect(
+      if (mounted) {
+        setState(() {
+          _connectionStatus = 'Attempting to connect...';
+        });
+      }
+
+      // Create the WebSocket channel in an async context
+      final channel = WebSocketChannel.connect(
         Uri.parse('ws://192.168.15.192:8000/ws'),
       );
+
+      // Wait for the connection to be ready with a shorter timeout
+      await channel.ready.timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          channel.sink.close();
+          throw TimeoutException('Connection timed out');
+        },
+      );
+
+      if (!mounted) {
+        channel.sink.close();
+        return;
+      }
+
+      _channel = channel;
+
+      if (!mounted) return;
 
       // Mark as connected once the stream is ready
       setState(() {
@@ -185,6 +219,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
             });
           }
           debugPrint('WebSocket error: $error');
+          _isConnecting = false;
         },
         onDone: () {
           if (mounted) {
@@ -193,11 +228,13 @@ class _AlignmentPageState extends State<AlignmentPage> {
               _connectionStatus = 'Connection closed';
             });
           }
+          _isConnecting = false;
           // Attempt to reconnect after 3 seconds
           Future.delayed(const Duration(seconds: 3), _connectWebSocket);
         },
       );
     } catch (e) {
+      _isConnecting = false;
       if (mounted) {
         setState(() {
           _isConnected = false;
@@ -205,8 +242,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
         });
       }
       debugPrint('WebSocket connection error: $e');
-      // Attempt to reconnect after 3 seconds
-      Future.delayed(const Duration(seconds: 3), _connectWebSocket);
+      // Attempt to reconnect after 5 seconds
+      Future.delayed(const Duration(seconds: 5), _connectWebSocket);
     }
   }
 
@@ -1785,6 +1822,10 @@ class _AlignmentPageState extends State<AlignmentPage> {
         _azimuthPhase = AzimuthPhase.aligned;
         _azimuthConfirmed = true;
         _currentStep = AlignmentStep.elevation;
+        // Advance debug view if in override mode
+        if (_overrideMode) {
+          _overrideView = OverrideView.elevationSweep;
+        }
       });
 
       _showConfirmationDialog(
@@ -1793,6 +1834,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
             'Azimuth alignment complete. You are now at $_azimuthTurnsToMaxRSL turnbuckles from the starting position.\n\nProceeding to elevation alignment...',
         onConfirm: () {
           Navigator.pop(context);
+          // Start elevation sweep after azimuth is confirmed
+          _startElevationSweep();
         },
       );
     }
@@ -1824,6 +1867,10 @@ class _AlignmentPageState extends State<AlignmentPage> {
           _elevationPhase = ElevationPhase.aligned;
           _elevationConfirmed = true;
           _side1Complete = true;
+          // Advance debug view to azimuth sweep for side 2 if in override mode
+          if (_overrideMode) {
+            _overrideView = OverrideView.azimuthSweep;
+          }
         });
 
         _showConfirmationDialog(
@@ -1841,6 +1888,11 @@ class _AlignmentPageState extends State<AlignmentPage> {
           _elevationPhase = ElevationPhase.aligned;
           _elevationConfirmed = true;
           _processCompleted = true;
+          _currentStep = AlignmentStep.finalized;
+          // Advance debug view to completed if in override mode
+          if (_overrideMode) {
+            _overrideView = OverrideView.completed;
+          }
         });
 
         _showConfirmationDialog(
