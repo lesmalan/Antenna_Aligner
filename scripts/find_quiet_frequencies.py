@@ -10,6 +10,7 @@ Usage:
 """
 from __future__ import annotations
 import argparse
+import os
 import sys
 import time
 import numpy as np
@@ -111,6 +112,9 @@ def main():
     ap.add_argument("--min-bandwidth", default=10.0, type=float, help="Minimum bandwidth in MHz for quiet band (default: 10)")
     ap.add_argument("--save-csv", action="store_true", help="Save scan results to CSV")
     ap.add_argument("--receiver-port", default=1, type=int, help="VNA receiver port (1 or 2, default: 1)")
+    ap.add_argument("--csv-dir", default=".", help="Directory to save CSV files")
+    ap.add_argument("--plots-dir", default=".", help="Directory to save plot files")
+    ap.add_argument("--filename", default="noise_scan", help="Base filename for output files (without extension)")
     args = ap.parse_args()
     
     # Determine frequency range
@@ -214,7 +218,9 @@ def main():
         # Save CSV if requested
         if args.save_csv:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            csv_path = f"noise_scan_{timestamp}.csv"
+            csv_filename = f"{args.filename}_{timestamp}.csv"
+            csv_path = os.path.join(args.csv_dir, csv_filename)
+            os.makedirs(args.csv_dir, exist_ok=True)
             with open(csv_path, 'w') as f:
                 f.write("Frequency_Hz,Frequency_MHz,Power_dBm\n")
                 for freq, pwr in zip(freqs, power_dbm):
@@ -225,12 +231,21 @@ def main():
         print("\nGenerating plot...")
         fig, ax = plt.subplots(figsize=(12, 6))
         
+        # Find the quietest frequency
+        quietest_idx = np.argmin(power_dbm)
+        quietest_freq = freqs[quietest_idx]
+        quietest_power = power_dbm[quietest_idx]
+        
         ax.plot(freqs / 1e6, power_dbm, linewidth=1, label='Measured Power')
         ax.axhline(np.median(power_dbm), color='orange', linestyle='--', 
                    linewidth=1.5, label=f'Median: {np.median(power_dbm):.1f} dBm')
         ax.axhline(np.median(power_dbm) - args.threshold_db, color='green', 
                    linestyle=':', linewidth=1.5, 
                    label=f'Quiet Threshold: {np.median(power_dbm) - args.threshold_db:.1f} dBm')
+        
+        # Mark the quietest frequency
+        ax.plot(quietest_freq / 1e6, quietest_power, 'r*', markersize=15, 
+                label=f'Quietest: {hz_to_str(quietest_freq)} @ {quietest_power:.1f} dBm', zorder=5)
         
         # Highlight quiet bands
         for f_start, f_stop, _, _ in quiet_bands:
@@ -240,16 +255,18 @@ def main():
         ax.set_ylabel('Power (dBm)', fontsize=12)
         ax.set_title('RF Noise Floor Scan - Quiet Band Detection', fontsize=14, fontweight='bold')
         ax.grid(True, alpha=0.3)
-        ax.legend()
+        ax.legend(loc='best')
         
         plt.tight_layout()
         
         # Save plot
-        plot_path = f"noise_scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        plot_filename = f"{args.filename}_{timestamp}.png"
+        plot_path = os.path.join(args.plots_dir, plot_filename)
+        os.makedirs(args.plots_dir, exist_ok=True)
         plt.savefig(plot_path, dpi=150)
+        plt.close()  # Close the plot to free memory
         print(f"Plot saved to: {plot_path}")
-        
-        plt.show()
         
         print(f"\n{'='*60}")
         print("RECOMMENDATION:")
@@ -263,6 +280,15 @@ def main():
             print("Consider using the frequency with minimum power:")
             print(f"{hz_to_str(freqs[np.argmin(power_dbm)])}")
         print(f"{'='*60}\n")
+        
+        # Automatically open the saved plot
+        print("Opening plot...")
+        try:
+            import subprocess
+            subprocess.Popen(['xdg-open', plot_path])
+        except Exception as e:
+            print(f"Could not automatically open plot: {e}")
+            print(f"Please open manually: {plot_path}")
         
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)

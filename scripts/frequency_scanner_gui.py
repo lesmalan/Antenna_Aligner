@@ -41,6 +41,7 @@ class FrequencyScannerGUI:
         
         # Options
         self.save_csv = tk.BooleanVar(value=True)
+        self.filename = tk.StringVar(value="noise_scan")
         
         # Set default directories
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -196,6 +197,14 @@ class FrequencyScannerGUI:
                         variable=self.save_csv).grid(row=row, column=0, columnspan=2, sticky=tk.W, pady=2)
         row += 1
         
+        # Filename
+        ttk.Label(main_frame, text="Output Filename:").grid(row=row, column=0, sticky=tk.W, pady=2)
+        filename_frame = ttk.Frame(main_frame)
+        filename_frame.grid(row=row, column=1, sticky=tk.W, pady=2)
+        ttk.Entry(filename_frame, textvariable=self.filename, width=25).pack(side=tk.LEFT)
+        ttk.Label(filename_frame, text="(without extension)").pack(side=tk.LEFT, padx=5)
+        row += 1
+        
         # Directory settings
         ttk.Label(main_frame, text="CSV Directory:").grid(row=row, column=0, sticky=tk.W, pady=2)
         dir_frame = ttk.Frame(main_frame)
@@ -310,6 +319,11 @@ class FrequencyScannerGUI:
         if self.save_csv.get():
             cmd.append("--save-csv")
         
+        # Output directories and filename
+        cmd.extend(["--csv-dir", self.csv_directory.get()])
+        cmd.extend(["--plots-dir", self.plots_directory.get()])
+        cmd.extend(["--filename", self.filename.get()])
+        
         return cmd
     
     def start_scan(self):
@@ -318,21 +332,96 @@ class FrequencyScannerGUI:
             return
         
         try:
-            # Validate inputs
-            float(self.center_freq.get()) if self.freq_mode.get() == "center_span" else float(self.start_freq.get())
-            float(self.span_freq.get()) if self.freq_mode.get() == "center_span" else float(self.stop_freq.get())
-            int(self.points.get())
-            float(self.threshold_db.get())
-            float(self.min_bandwidth.get())
-        except ValueError as e:
-            messagebox.showerror("Invalid Input", f"Please check your input values:\n{e}")
+            # Validate inputs with detailed error messages
+            if self.freq_mode.get() == "center_span":
+                try:
+                    center = float(self.center_freq.get())
+                    if center <= 0:
+                        raise ValueError("Center frequency must be positive")
+                except ValueError as e:
+                    messagebox.showerror("Invalid Input", f"Center Frequency Error:\n{e}\n\nPlease enter a valid number (e.g., 900e6 for 900 MHz)")
+                    return
+                
+                try:
+                    span = float(self.span_freq.get())
+                    if span <= 0:
+                        raise ValueError("Span must be positive")
+                except ValueError as e:
+                    messagebox.showerror("Invalid Input", f"Span Error:\n{e}\n\nPlease enter a valid number (e.g., 200e6 for 200 MHz)")
+                    return
+            else:
+                try:
+                    start = float(self.start_freq.get())
+                    if start <= 0:
+                        raise ValueError("Start frequency must be positive")
+                except ValueError as e:
+                    messagebox.showerror("Invalid Input", f"Start Frequency Error:\n{e}\n\nPlease enter a valid number (e.g., 800e6 for 800 MHz)")
+                    return
+                
+                try:
+                    stop = float(self.stop_freq.get())
+                    if stop <= 0:
+                        raise ValueError("Stop frequency must be positive")
+                    if stop <= start:
+                        raise ValueError("Stop frequency must be greater than start frequency")
+                except ValueError as e:
+                    messagebox.showerror("Invalid Input", f"Stop Frequency Error:\n{e}\n\nPlease enter a valid number greater than start frequency")
+                    return
+            
+            try:
+                points = int(self.points.get())
+                if points < 2:
+                    raise ValueError("Must have at least 2 points")
+                if points > 10001:
+                    raise ValueError("Too many points (max 10001)")
+            except ValueError as e:
+                messagebox.showerror("Invalid Input", f"Points Error:\n{e}\n\nPlease enter an integer between 2 and 10001")
+                return
+            
+            try:
+                threshold = float(self.threshold_db.get())
+                if threshold < 0:
+                    raise ValueError("Threshold must be non-negative")
+            except ValueError as e:
+                messagebox.showerror("Invalid Input", f"Threshold Error:\n{e}\n\nPlease enter a positive number (e.g., 5.0)")
+                return
+            
+            try:
+                min_bw = float(self.min_bandwidth.get())
+                if min_bw < 0:
+                    raise ValueError("Minimum bandwidth must be non-negative")
+            except ValueError as e:
+                messagebox.showerror("Invalid Input", f"Minimum Bandwidth Error:\n{e}\n\nPlease enter a positive number (e.g., 10.0)")
+                return
+            
+            # Check filename is valid
+            if not self.filename.get().strip():
+                messagebox.showerror("Invalid Input", "Filename Error:\n\nPlease enter a filename")
+                return
+            
+            # Check directories exist or can be created
+            try:
+                os.makedirs(self.csv_directory.get(), exist_ok=True)
+            except Exception as e:
+                messagebox.showerror("Directory Error", f"Cannot create CSV directory:\n{self.csv_directory.get()}\n\nError: {e}")
+                return
+            
+            try:
+                os.makedirs(self.plots_directory.get(), exist_ok=True)
+            except Exception as e:
+                messagebox.showerror("Directory Error", f"Cannot create Plots directory:\n{self.plots_directory.get()}\n\nError: {e}")
+                return
+                
+        except Exception as e:
+            messagebox.showerror("Validation Error", f"Unexpected validation error:\n{e}")
             return
         
         # Clear output
         self.output_text.delete(1.0, tk.END)
         
-        # Change to output directories
-        os.chdir(self.csv_directory.get())
+        # Ensure output directories exist
+        os.makedirs(self.csv_directory.get(), exist_ok=True)
+        os.makedirs(self.plots_directory.get(), exist_ok=True)
         
         # Build and run command
         cmd = self.build_command()
@@ -351,38 +440,62 @@ class FrequencyScannerGUI:
     
     def run_scan(self, cmd):
         """Run the scan in a separate thread"""
+        error_message = None
         try:
             self.process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
+                stderr=subprocess.PIPE,
                 text=True,
                 bufsize=1,
                 universal_newlines=True
             )
             
             # Read output line by line
+            stdout_lines = []
+            stderr_lines = []
+            
             for line in self.process.stdout:
+                stdout_lines.append(line)
                 self.root.after(0, self.append_output, line)
             
             self.process.wait()
             return_code = self.process.returncode
             
+            # Capture any stderr output
+            stderr_output = self.process.stderr.read()
+            if stderr_output:
+                stderr_lines.append(stderr_output)
+                self.root.after(0, self.append_output, f"\n=== ERROR OUTPUT ===\n{stderr_output}\n")
+            
             if return_code == 0:
-                self.root.after(0, self.scan_complete, True)
+                self.root.after(0, self.scan_complete, True, None)
             else:
-                self.root.after(0, self.scan_complete, False)
+                error_message = f"Process exited with code {return_code}"
+                if stderr_output:
+                    error_message += f"\n\nError details:\n{stderr_output}"
+                self.root.after(0, self.scan_complete, False, error_message)
         
+        except FileNotFoundError as e:
+            error_message = f"Script not found: {cmd[1]}\n\nFull path: {os.path.abspath(cmd[1]) if len(cmd) > 1 else 'unknown'}\n\nError: {e}"
+            self.root.after(0, self.append_output, f"\n=== FILE NOT FOUND ERROR ===\n{error_message}\n")
+            self.root.after(0, self.scan_complete, False, error_message)
+        except PermissionError as e:
+            error_message = f"Permission denied running script\n\nCommand: {' '.join(cmd)}\n\nError: {e}"
+            self.root.after(0, self.append_output, f"\n=== PERMISSION ERROR ===\n{error_message}\n")
+            self.root.after(0, self.scan_complete, False, error_message)
         except Exception as e:
-            self.root.after(0, self.append_output, f"\nError: {e}\n")
-            self.root.after(0, self.scan_complete, False)
+            import traceback
+            error_message = f"Unexpected error: {type(e).__name__}\n\nDetails: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+            self.root.after(0, self.append_output, f"\n=== UNEXPECTED ERROR ===\n{error_message}\n")
+            self.root.after(0, self.scan_complete, False, error_message)
     
     def append_output(self, text):
         """Append text to output area (called from main thread)"""
         self.output_text.insert(tk.END, text)
         self.output_text.see(tk.END)
     
-    def scan_complete(self, success):
+    def scan_complete(self, success, error_message=None):
         """Called when scan completes"""
         self.running = False
         self.scan_button.config(state=tk.NORMAL)
@@ -393,14 +506,17 @@ class FrequencyScannerGUI:
             messagebox.showinfo("Scan Complete", "Frequency scan completed successfully!\nCheck the plot window for results.")
         else:
             self.status_label.config(text="Scan failed")
-            messagebox.showerror("Scan Failed", "The scan encountered an error. Check the output for details.")
+            if error_message:
+                messagebox.showerror("Scan Failed", f"The scan encountered an error:\n\n{error_message}\n\nCheck the output window for full details.")
+            else:
+                messagebox.showerror("Scan Failed", "The scan encountered an error.\n\nCheck the output window for details.")
     
     def stop_scan(self):
         """Stop the running scan"""
         if self.process:
             self.process.terminate()
             self.append_output("\n\n=== Scan stopped by user ===\n")
-            self.scan_complete(False)
+            self.scan_complete(False, "Scan stopped by user")
     
     def show_help(self):
         """Show help dialog"""

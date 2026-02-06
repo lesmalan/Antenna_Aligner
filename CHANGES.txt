@@ -210,3 +210,119 @@ File Recovery from Commit Issues - 02/05/26
    - Added systemd service integration details
    - Recorded Flutter app WebSocket updates from 02/04/26
    - Ensured complete change history preservation
+
+
+Frequency Scanner Tool and Enhancements - 02/06/26
+==================================================
+
+1. Created find_quiet_frequencies.py - RF Noise Floor Scanner
+   - Scans frequency ranges to identify low-noise bands for RF transmission
+   - Uses ZNLE6 VNA + Pasco WA-9800A receiver to measure background RF noise
+   - Analyzes spectrum to find quiet (low-noise) frequency bands
+   - Identifies bands below configurable noise threshold
+   - Provides frequency recommendations for NanoVNA transmission experiments
+
+2. Frequency Scanner Features
+   - Dual frequency input modes: Center+Span or Start+Stop
+   - Configurable scan parameters: points, threshold, minimum bandwidth
+   - Automatic quiet band detection with configurable sensitivity
+   - Statistical analysis: mean, median, min, max, standard deviation
+   - Visual identification of quiet bands (highlighted in green on plots)
+   - CSV export option for raw frequency vs power data
+   - Comprehensive terminal output with recommendations
+
+3. Created frequency_scanner_gui.py - GUI for Frequency Scanner
+   - Graphical interface for find_quiet_frequencies.py
+   - Connection settings: IP address, port, receiver port selection
+   - Frequency mode toggle: Center+Span or Start+Stop
+   - Quick preset buttons: 900 MHz ±100 MHz, 2.4 GHz ±100 MHz, 5 GHz ±200 MHz
+   - Scan parameters: points, quiet threshold (dB), minimum bandwidth (MHz)
+   - Custom filename input for organized data storage
+   - Separate directory selectors for CSV and plot outputs
+   - Real-time scan output display with scrollable text area
+   - Help button with built-in documentation
+   - Start/Stop buttons with status feedback
+
+4. Desktop Integration
+   - Created Frequency_Scanner.desktop launcher
+   - Single-click access from desktop icon
+   - Saved in repository at scripts/Frequency_Scanner.desktop
+   - Configured with virtual environment Python interpreter
+   - Proper working directory and startup settings
+
+5. GitHub Connection and Repository Fixes
+   - Set up automatic GitHub authentication using GitHub CLI (gh)
+   - Configured git to use gh credentials with "gh auth setup-git"
+   - Fixed corrupted git repository objects
+   - Created recover_git_repo.sh script for future repository repairs
+   - Recovered from empty object file errors
+   - Repository now properly connected to github.com/lesmalan/Antenna_Aligner.git
+   - GitHub authentication persists across system reboots
+
+6. Monitor Mode Y-Axis Scaling Enhancement (znle_pyvisa.py)
+   - Updated time-series plots to use consistent y-axis scaling
+   - Y-axis now set to average ± 2.5 dB for all monitor mode measurements
+   - Calculates average amplitude across entire measurement duration
+   - Displays average and y-axis range in console output
+   - Enables direct visual comparison between different alignment runs
+   - Prevents auto-scaling from hiding small signal variations
+
+7. Output File Management Improvements
+   - Added --csv-dir, --plots-dir, --filename arguments to find_quiet_frequencies.py
+   - Fixed plot/CSV saving to respect user-specified directories
+   - Files now saved with custom base filename plus timestamp
+   - GUI properly passes directory and filename parameters to backend script
+   - Format: {filename}_{timestamp}.csv and {filename}_{timestamp}.png
+   - Directories automatically created if they don't exist
+
+8. Documentation and Change Tracking
+   - Created vscode_github_commands.txt with GitHub connection instructions
+   - Documented authentication setup for VS Code integration
+   - Recorded all changes in CHANGES.txt following established format conventions
+   - Preserved complete history of tools created and modifications made
+
+9. Enhanced Error Reporting (frequency_scanner_gui.py)
+   - Implemented comprehensive input validation with field-specific error messages
+   - Added stderr capture for subprocess error handling
+   - Categorized exceptions: FileNotFoundError, PermissionError, general exceptions
+   - Added full traceback logging to scan output display
+   - Provides examples of valid input formats in error messages
+   - Validates IP address, port numbers, frequency values, and scan parameters
+   - Shows specific field names and constraints when validation fails
+
+10. Bug Fix - Missing Import Statement (find_quiet_frequencies.py)
+   - Added missing "import os" at line 13
+   - Fixed NameError that prevented directory creation and file operations
+   - Required for os.path.join() and os.makedirs() function calls
+
+11. Plot Enhancement - Quietest Frequency Marker
+   - Added red star marker on plot to indicate quietest detected frequency
+   - Marker placed at minimum power point across entire spectrum
+   - Legend entry: "Quietest: {frequency} MHz at {power} dBm"
+   - Provides quick visual identification of optimal transmission frequency
+
+12. Non-Blocking Plot Display (find_quiet_frequencies.py)
+   - Removed plt.show() which was blocking script execution
+   - Script now completes immediately after scan finishes
+   - Replaced with plt.close() to free memory resources
+   - Added automatic plot opening using xdg-open subprocess
+   - Plot opens in default image viewer as separate non-blocking process
+   - GUI now shows "Scan complete!" message immediately
+   - Enables continuous scanning operations without manual window management
+   - Fixes issue where scan appeared frozen until matplotlib window was closed
+
+Usage - Frequency Scanner:
+   - Launch GUI: Double-click "Frequency Scanner" desktop icon
+   - Or from terminal: python3 scripts/frequency_scanner_gui.py
+   - Command line: python3 scripts/find_quiet_frequencies.py --center 900e6 --span 200e6
+   - Select frequency range (presets or custom)
+   - Configure scan parameters and output filename
+   - Click "Start Scan" to begin measurement
+   - View real-time progress and results
+   - Check Plots/ directory for visual analysis
+   - Use recommended frequency for NanoVNA transmission experiments
+
+Dependencies Added:
+   - numpy (for statistical analysis and array operations)
+   - subprocess (Python standard library, for automatic plot opening)
+   - All matplotlib and pyvisa dependencies already present from previous tools

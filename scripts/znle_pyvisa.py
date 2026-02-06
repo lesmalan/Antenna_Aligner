@@ -129,15 +129,24 @@ def main() -> None:
                 plot_filename = os.path.join(plots_dir, base_name)
             else:
                 plot_filename = args.out.rsplit('.', 1)[0] + '_plot.png'
+            
+            # Calculate average for consistent y-axis scaling
+            avg_amplitude = sum(amplitudes) / len(amplitudes) if amplitudes else 0
+            
             plt.figure(figsize=(10, 6))
             plt.plot(timestamps, amplitudes, linewidth=1.5, marker='o', markersize=3)
             plt.xlabel("Time (seconds)")
             plt.ylabel("Amplitude (dB)")
             plt.title(f"{args.param} Amplitude vs Time")
             plt.grid(True, alpha=0.3)
+            
+            # Set y-axis limits to ±2.5 dB around average
+            plt.ylim(avg_amplitude - 2.5, avg_amplitude + 2.5)
+            
             plt.tight_layout()
             plt.savefig(plot_filename, dpi=150)
             print(f"Saved plot to {plot_filename}")
+            print(f"Average amplitude: {avg_amplitude:.2f} dB, Y-axis range: [{avg_amplitude-2.5:.2f}, {avg_amplitude+2.5:.2f}] dB")
     else:
         # Single sweep mode (original behavior)
         inst.write("INIT")
