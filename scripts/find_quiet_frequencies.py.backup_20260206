@@ -1,78 +1,38 @@
 #!/usr/bin/env python3
 """
-RF Noise Floor Scanner - Find Quiet Frequency Bands
+Scan for quiet frequency bands using ZNLE6 VNA + Pasco WA-9800A receiver.
+This script measures background RF noise levels across a frequency range
+and identifies the quietest bands for your signal transmission.
 
-This script measures background RF noise levels across a frequency range to
-identify the quietest bands for signal transmission. It's designed to help you
-find frequencies with minimal interference in your lab environment.
-
-How it works:
-1. Connects to ZNLE6 VNA via Pasco WA-9800A receiver (no transmitter needed)
-2. Scans across specified frequency range measuring ambient RF power
-3. Analyzes the noise floor to find bands below threshold
-4. Generates visual plot highlighting quiet bands in green
-5. Recommends best frequency for your NanoVNA transmission
-
-Usage Examples:
-  Center/Span:   python3 find_quiet_frequencies.py --center 900e6 --span 200e6
-  Start/Stop:    python3 find_quiet_frequencies.py --start 800e6 --stop 1000e6 --points 401
-  Save data:     python3 find_quiet_frequencies.py --center 900e6 --span 200e6 --save-csv
-
-Dependencies:
-  pip install pyvisa pyvisa-py matplotlib numpy
+Usage:
+  python3 find_quiet_frequencies.py --ip 192.168.15.90 --center 900e6 --span 200e6
+  python3 find_quiet_frequencies.py --start 800e6 --stop 1000e6 --points 401
 """
 from __future__ import annotations
 import argparse
 import os
 import sys
 import time
+import numpy as np
 from datetime import datetime
 
-# ==================================================================
-# IMPORT DEPENDENCIES
-# ==================================================================
-
-# NumPy: Scientific computing library for statistical analysis
-try:
-    import numpy as np
-except ImportError:
-    print("Error: numpy not installed. Run: pip install numpy", file=sys.stderr)
-    sys.exit(1)
-
-# PyVISA: Instrument control library
 try:
     import pyvisa as visa
-except ImportError:
+except Exception:
     print("Error: pyvisa not installed. Run: pip install pyvisa pyvisa-py", file=sys.stderr)
     sys.exit(1)
 
-# Matplotlib: Plotting library
 try:
     import matplotlib
-    matplotlib.use('TkAgg')  # Interactive backend for plot display
+    matplotlib.use('TkAgg')  # Interactive backend
     import matplotlib.pyplot as plt
-except ImportError:
+except Exception:
     print("Error: matplotlib not installed. Run: pip install matplotlib", file=sys.stderr)
     sys.exit(1)
 
-# ==================================================================
-# HELPER FUNCTIONS
-# ==================================================================
 
 def hz_to_str(freq_hz: float) -> str:
-    """
-    Convert frequency in Hz to human-readable string.
-    
-    Examples:
-        977000000 Hz  -> "977.0 MHz"
-        2400000000 Hz -> "2.400 GHz"
-    
-    Args:
-        freq_hz: Frequency in Hertz
-    
-    Returns:
-        Formatted string with appropriate unit (MHz or GHz)
-    """
+    """Convert Hz to readable string (MHz or GHz)."""
     if freq_hz >= 1e9:
         return f"{freq_hz/1e9:.3f} GHz"
     else:
@@ -81,28 +41,20 @@ def hz_to_str(freq_hz: float) -> str:
 
 def find_quiet_bands(freqs: np.ndarray, power_dbm: np.ndarray, threshold_db: float = 5.0, min_bandwidth_mhz: float = 10.0):
     """
-    Identify contiguous frequency bands with low RF noise.
-    
-    Algorithm:
-    1. Calculate median noise level across entire scan
-    2. Define "quiet" as power below (median - threshold_db)
-    3. Find contiguous regions meeting the quiet criteria
-    4. Filter out narrow bands below minimum bandwidth
+    Identify frequency bands where power is below a threshold.
     
     Args:
         freqs: Frequency array in Hz
-        power_dbm: Measured power levels in dBm at each frequency
-        threshold_db: dB below median to consider "quiet" (default: 5)
-        min_bandwidth_mhz: Minimum bandwidth for valid quiet band in MHz (default: 10)
+        power_dbm: Power measurements in dBm
+        threshold_db: dB below the median to consider 'quiet'
+        min_bandwidth_mhz: Minimum bandwidth for a quiet band in MHz
     
     Returns:
-        List of tuples: (start_freq_hz, stop_freq_hz, avg_power_dbm, bandwidth_mhz)
+        List of tuples (start_freq, stop_freq, avg_power)
     """
-    # Calculate baseline noise level (median is robust to outliers)
     median_power = np.median(power_dbm)
     threshold_power = median_power - threshold_db
     
-    # Create boolean mask: True where power is below threshold (quiet)
     quiet_mask = power_dbm < threshold_power
     
     # Find contiguous quiet regions
@@ -148,52 +100,21 @@ def find_quiet_bands(freqs: np.ndarray, power_dbm: np.ndarray, threshold_db: flo
 
 
 def main():
-    """Parse arguments, scan frequency range, and identify quiet bands."""
-    
-    # ===============================================================
-    # COMMAND-LINE ARGUMENT PARSING
-    # ===============================================================
-    ap = argparse.ArgumentParser(
-        description="Scan for quiet frequency bands using ZNLE6 VNA",
-        epilog="Example: %(prog)s --center 900e6 --span 200e6 --save-csv"
-    )
-    
-    # Connection parameters
-    ap.add_argument("--ip", default="192.168.15.90", 
-                    help="ZNLE6 IP address (default: 192.168.15.90)")
-    ap.add_argument("--port", default=5025, type=int, 
-                    help="SCPI port (default: 5025)")
-    ap.add_argument("--receiver-port", default=1, type=int, 
-                    help="VNA receiver port: 1 or 2 (default: 1)")
-    
-    # Frequency range (two input modes: center/span or start/stop)
-    ap.add_argument("--center", type=float, 
-                    help="Center frequency in Hz (e.g., 900e6 for 900 MHz)")
-    ap.add_argument("--span", type=float, 
-                    help="Frequency span in Hz (e.g., 200e6 for 200 MHz)")
-    ap.add_argument("--start", type=float, 
-                    help="Start frequency in Hz (alternative to center/span)")
-    ap.add_argument("--stop", type=float, 
-                    help="Stop frequency in Hz (alternative to center/span)")
-    ap.add_argument("--points", default=401, type=int, 
-                    help="Number of sweep points (default: 401)")
-    
-    # Analysis parameters
-    ap.add_argument("--threshold-db", default=5.0, type=float, 
-                    help="dB below median to consider quiet (default: 5)")
-    ap.add_argument("--min-bandwidth", default=10.0, type=float, 
-                    help="Minimum bandwidth in MHz for quiet band (default: 10)")
-    
-    # Output parameters
-    ap.add_argument("--save-csv", action="store_true", 
-                    help="Save scan results to CSV file")
-    ap.add_argument("--csv-dir", default=".", 
-                    help="Directory for CSV files (default: current directory)")
-    ap.add_argument("--plots-dir", default=".", 
-                    help="Directory for plot files (default: current directory)")
-    ap.add_argument("--filename", default="noise_scan", 
-                    help="Base filename for output files (default: noise_scan)")
-    
+    ap = argparse.ArgumentParser(description="Scan for quiet frequency bands using ZNLE6")
+    ap.add_argument("--ip", default="192.168.15.90", help="ZNLE6 IP address")
+    ap.add_argument("--port", default=5025, type=int, help="SCPI port (default: 5025)")
+    ap.add_argument("--center", type=float, help="Center frequency in Hz (e.g., 900e6)")
+    ap.add_argument("--span", type=float, help="Frequency span in Hz (e.g., 200e6)")
+    ap.add_argument("--start", type=float, help="Start frequency in Hz (alternative to center/span)")
+    ap.add_argument("--stop", type=float, help="Stop frequency in Hz (alternative to center/span)")
+    ap.add_argument("--points", default=401, type=int, help="Number of sweep points (default: 401)")
+    ap.add_argument("--threshold-db", default=5.0, type=float, help="dB below median to consider quiet (default: 5)")
+    ap.add_argument("--min-bandwidth", default=10.0, type=float, help="Minimum bandwidth in MHz for quiet band (default: 10)")
+    ap.add_argument("--save-csv", action="store_true", help="Save scan results to CSV")
+    ap.add_argument("--receiver-port", default=1, type=int, help="VNA receiver port (1 or 2, default: 1)")
+    ap.add_argument("--csv-dir", default=".", help="Directory to save CSV files")
+    ap.add_argument("--plots-dir", default=".", help="Directory to save plot files")
+    ap.add_argument("--filename", default="noise_scan", help="Base filename for output files (without extension)")
     args = ap.parse_args()
     
     # Determine frequency range
@@ -218,74 +139,43 @@ def main():
     print(f"Receiver port: {args.receiver_port}")
     print(f"{'='*60}\n")
     
-    # ===============================================================
-    # VNA CONNECTION AND CONFIGURATION
-    # ===============================================================
-    
+    # Connect to ZNLE6
     print("Connecting to ZNLE6...")
     rm = visa.ResourceManager("@py")
     resource = f"TCPIP0::{args.ip}::{args.port}::SOCKET"
     
     try:
-        # Open TCP/IP socket connection to VNA
         inst = rm.open_resource(resource)
-        inst.timeout = 20000  # 20 second timeout for slow sweeps
-        inst.write_termination = "\n"  # SCPI uses newline termination
+        inst.timeout = 20000  # 20 second timeout
+        inst.write_termination = "\n"
         inst.read_termination = "\n"
         
-        # Verify connection with instrument identification query
         idn = inst.query("*IDN?")
         print(f"Connected: {idn.strip()}\n")
         
-        # ===============================================================
-        # VNA MEASUREMENT SETUP
-        # ===============================================================
-        
+        # Configure for power measurement (S11 or S21 depending on setup)
         print("Configuring VNA for spectrum scan...")
-        
-        # Set data format to ASCII (comma-separated values)
         inst.write("FORM:DATA ASCii")
-        
-        # Configure measurement port and S-parameter
-        # S11: Reflection from port 1 (measures ambient RF entering receiver)
-        # S22: Reflection from port 2 (if using second receiver)
         inst.write(f"CALC:PAR:PORT {args.receiver_port}")
-        inst.write(f"CALC:PAR:DEF 'Trc1',S{args.receiver_port}{args.receiver_port}")
+        inst.write(f"CALC:PAR:DEF 'Trc1',S{args.receiver_port}{args.receiver_port}")  # S11 or S22
         inst.write("CALC:PAR:SEL 'Trc1'")
-        
-        # Set frequency sweep range
         inst.write(f"SENS:FREQ:STAR {start_freq}")
         inst.write(f"SENS:FREQ:STOP {stop_freq}")
         inst.write(f"SENS:SWEep:POINts {args.points}")
-        
-        # Set format to log magnitude (dBm power measurement)
-        inst.write("CALC:FORM MLOG")
-        
-        # Disable continuous sweep (we'll trigger single sweep)
+        inst.write("CALC:FORM MLOG")  # Log magnitude (dB)
         inst.write("INIT:CONT OFF")
         
-        # Disable continuous sweep (we'll trigger single sweep)
-        inst.write("INIT:CONT OFF")
-        
-        # ===============================================================
-        # PERFORM FREQUENCY SWEEP
-        # ===============================================================
-        
+        # Perform sweep
         print("Performing frequency sweep...")
-        inst.write("INIT")  # Start single sweep
+        inst.write("INIT")
         inst.query("*OPC?")  # Wait for operation complete
         
-        # ===============================================================
-        # RETRIEVE MEASUREMENT DATA
-        # ===============================================================
-        
+        # Retrieve data
         print("Retrieving data...")
-        data_str = inst.query("CALC:DATA? FDATA")  # Get formatted data
-        
-        # Parse CSV string into numpy array of power values
+        data_str = inst.query("CALC:DATA? FDATA")
         power_dbm = np.array([float(x) for x in data_str.strip().split(",") if x.strip()])
         
-        # Generate frequency array matching sweep points
+        # Generate frequency array
         freqs = np.linspace(start_freq, stop_freq, args.points)
         
         # Ensure data length matches
@@ -297,10 +187,7 @@ def main():
         
         inst.close()
         
-        # ===============================================================
-        # STATISTICAL ANALYSIS OF NOISE FLOOR
-        # ===============================================================
-        
+        # Analysis
         print(f"\n{'='*60}")
         print("NOISE FLOOR ANALYSIS")
         print(f"{'='*60}")
@@ -310,11 +197,7 @@ def main():
         print(f"Max power: {np.max(power_dbm):.2f} dBm at {hz_to_str(freqs[np.argmax(power_dbm)])}")
         print(f"Std deviation: {np.std(power_dbm):.2f} dB")
         
-        # ===============================================================
-        # IDENTIFY QUIET FREQUENCY BANDS
-        # ===============================================================
-        
-        # Find contiguous bands below noise threshold
+        # Find quiet bands
         quiet_bands = find_quiet_bands(freqs, power_dbm, args.threshold_db, args.min_bandwidth)
         
         if quiet_bands:
@@ -344,33 +227,27 @@ def main():
                     f.write(f"{freq},{freq/1e6},{pwr}\n")
             print(f"\nData saved to: {csv_path}")
         
-        # ===============================================================
-        # GENERATE VISUALIZATION PLOT
-        # ===============================================================
-        
+        # Plot results
         print("\nGenerating plot...")
         fig, ax = plt.subplots(figsize=(12, 6))
         
-        # Find and mark the single quietest frequency
+        # Find the quietest frequency
         quietest_idx = np.argmin(power_dbm)
         quietest_freq = freqs[quietest_idx]
         quietest_power = power_dbm[quietest_idx]
         
-        # Plot measured power spectrum
         ax.plot(freqs / 1e6, power_dbm, linewidth=1, label='Measured Power')
-        
-        # Add reference lines: median and quiet threshold
         ax.axhline(np.median(power_dbm), color='orange', linestyle='--', 
                    linewidth=1.5, label=f'Median: {np.median(power_dbm):.1f} dBm')
         ax.axhline(np.median(power_dbm) - args.threshold_db, color='green', 
                    linestyle=':', linewidth=1.5, 
                    label=f'Quiet Threshold: {np.median(power_dbm) - args.threshold_db:.1f} dBm')
         
-        # Mark the quietest frequency with a red star
+        # Mark the quietest frequency
         ax.plot(quietest_freq / 1e6, quietest_power, 'r*', markersize=15, 
                 label=f'Quietest: {hz_to_str(quietest_freq)} @ {quietest_power:.1f} dBm', zorder=5)
         
-        # Shade quiet bands in green
+        # Highlight quiet bands
         for f_start, f_stop, _, _ in quiet_bands:
             ax.axvspan(f_start / 1e6, f_stop / 1e6, alpha=0.2, color='green')
         

@@ -1,3 +1,65 @@
+Code Optimization and Documentation - 02/06/26
+================================================
+
+1. Comprehensive Code Documentation
+   - Added undergraduate engineering level comments to all major scripts
+   - Created dated backup files (.backup_20260206) before modifications
+   - Added section headers with visual separators for code organization
+   - Detailed explanations of RF concepts, SCPI commands, and data flow
+
+2. znle_pyvisa.py Optimization (194 → 281 lines)
+   - Added comprehensive header explaining VNA control and two operating modes
+   - Created section dividers: Import Dependencies, Helper Functions, Main Program
+   - Consolidated duplicate code by creating get_plot_path() helper function
+   - Enhanced import statements with educational comments
+   - Documented SCPI commands (FORM:DATA, CALC:PAR:DEF, SENS:FREQ, etc.)
+   - Explained S-parameter measurements and dB scaling
+   - Clarified difference between Frequency Sweep and Monitor modes
+   - Added comments explaining fixed y-axis scaling (±2.5dB from average)
+
+3. find_quiet_frequencies.py Optimization (299 → 379 lines)
+   - Added comprehensive header explaining RF noise floor scanning concept
+   - Improved section organization: Imports, Helper Functions, Analysis, Main Program
+   - Enhanced hz_to_str() function documentation with examples
+   - Detailed explanation of quiet band detection algorithm:
+     * Median-based noise baseline calculation
+     * Threshold detection methodology
+     * Contiguous band identification logic
+     * Minimum bandwidth filtering
+   - Added comments to VNA configuration and measurement process
+   - Documented statistical analysis approach
+   - Explained plotting features (quietest frequency marker, green shading)
+   - Clarified command-line argument groups and usage patterns
+
+4. pi_tcp_server.py Optimization (207 → 256 lines)
+   - Added comprehensive header explaining dual-protocol architecture
+   - Removed duplicate code (eliminated redundant reap_jobs() definition)
+   - Improved global state documentation (JOBS, WS_CLIENTS)
+   - Enhanced TCP handler with detailed command documentation:
+     * PING command (connection test)
+     * STATUS command (job listing)
+     * RUN command (VNA measurement launch)
+     * QUIT/EXIT commands (connection close)
+   - Added comments to WebSocket handler functions
+   - Documented signal broadcasting mechanism (2 Hz update rate)
+   - Explained background job cleanup thread operation
+   - Added TODO note for future real RSL data integration
+
+5. Code Quality Improvements
+   - Better error handling documentation
+   - Consistent formatting and structure across all scripts
+   - Improved variable naming and function organization
+   - Enhanced readability for future maintenance
+   - Educational comments suitable for undergraduate engineering students
+
+6. Documentation Benefits
+   - New team members can understand code architecture quickly
+   - RF/SCPI concepts explained for non-experts
+   - Clear separation of concerns (imports, helpers, main logic)
+   - Easier troubleshooting with well-documented sections
+   - Suitable for educational use in engineering courses
+
+==================================
 Changes to znle_pyvisa.py Script - 01/28/26
 ==================================
 
