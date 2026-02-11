@@ -45,6 +45,26 @@ except ImportError:
     print("Error: matplotlib not installed. Run: pip install matplotlib", file=sys.stderr)
     sys.exit(1)
 
+def get_plot_path(csv_path: str) -> str:
+    """
+    Determine plot save location based on environment or CSV path.
+    
+    Args:
+        csv_path: CSV file path
+    
+    Returns:
+        Plot file path (.png)
+    """
+    base_name = os.path.basename(csv_path).rsplit('.', 1)[0] + '_plot.png'
+    
+    # Check if GUI specified separate plots directory
+    plots_dir = os.environ.get('PLOTS_DIR')
+    if plots_dir:
+        return os.path.join(plots_dir, base_name)
+    else:
+        # Save plot alongside CSV
+        return csv_path.rsplit('.', 1)[0] + '_plot.png'
+
 def main() -> None:
     """Parse arguments, connect to VNA, and execute measurement."""
     

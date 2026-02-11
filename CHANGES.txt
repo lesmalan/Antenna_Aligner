@@ -1,3 +1,89 @@
+Motor Controller Development - 02/11/26
+=========================================
+
+1. Motor Controller GUI Application (motor_controller_gui.py)
+   - Created comprehensive GUI for antenna stepper motor control
+   - Features:
+     * Automatic connection to Arduino on /dev/ttyACM0 at startup
+     * Auto-detection of available serial ports with refresh capability
+     * Real-time position display for azimuth and elevation
+     * Auto-update status monitoring option
+     * Adjustable motor speed control (1-100 RPM) with slider
+     * Relative movement controls with directional buttons (CW/CCW, Up/Down)
+     * Absolute positioning to target coordinates
+     * Home position calibration (SETZERO command)
+     * Emergency stop button
+     * Activity log with timestamps
+     * Automatic calibration prompt on startup
+   - Connection management with disconnect confirmation on exit
+   - Threading for non-blocking status updates
+
+2. Desktop Launcher Integration (Motor_Controller.desktop)
+   - Created desktop shortcut matching project style
+   - Uses virtual environment Python interpreter
+   - Icon: applications-engineering
+   - Categories: Science, Education, Engineering
+
+3. Arduino Firmware Enhancements (antenna_controller.ino)
+   - Motor Position Holding: Removed motor release after movements
+     * Motors now maintain holding torque to prevent position drift
+     * Holding torque only released during emergency stop
+   - Position Calibration: Added SETZERO command
+     * Sets current position as new home (0, 0)
+     * Allows calibration of horizontal receiver position
+   - Elevation Safety Limits: Implemented ±20 step limits
+     * MAX_ELEVATION = 20 steps (up from zero)
+     * MIN_ELEVATION = -20 steps (down from zero)
+     * Protects mounting hardware from geometry constraints
+     * Returns error message if movement would exceed limits
+   - Updated command documentation in header
+
+4. Motor Controller Script Updates (motor_controller.py)
+   - Base library unchanged (provides MotorController class)
+   - Used as reference for GUI serial communication protocol
+
+5. Default Configuration
+   - Serial port: /dev/ttyACM0 (Arduino Uno R3)
+   - Baudrate: 115200
+   - Default step increment: 10 steps
+   - Default motor speed: 30 RPM
+   - Elevation range: -20 to +20 steps from calibrated home
+
+6. User Workflow Improvements
+   - Auto-connect eliminates manual connection step
+   - Calibration prompt ensures proper home position setup
+   - Small default step size (10) for precise adjustments
+   - Visual warning about elevation limits in GUI
+   - Confirmation dialogs for critical operations
+
+
+Documentation Updates - 02/11/26
+================================
+
+1. Hardware Configuration Documentation (README.txt)
+   - Added comprehensive Hardware Configuration section
+   - Documented complete RF signal chain:
+     * Transmitter: NanoVNA-H4 (977 MHz) → 40dB amplifier (5V) → RFSpace TSA900 UWB antenna
+     * Receiver: Pasco WA-9800A (9V) with alligator clips → adapters → ZNLE6 Port 1
+   - Detailed ZNLE6 VNA specifications and network settings
+   - Documented Raspberry Pi 5 control computer configuration
+
+2. Network Infrastructure Documentation
+   - GL iNet AC1200 wireless router as network hub
+   - ZNLE6 connected via Ethernet to router
+   - Raspberry Pi 5, development PC, and application emulator via wireless
+   - Router WAN connection to internet
+
+3. Test Bed Apparatus Specifications
+   - Detailed 3D printed receiver mount assembly
+   - Two side brackets cradling Pasco WA-9800A receiver
+   - U-shaped bracket arm for elevation control
+   - NEMA17 stepper motor specifications:
+     * Elevation control (Up-Down Axis): Left-side motor with keyed connection
+     * Azimuth control (Rotational Axis): Center vertical motor
+   - Base structure with 4 legs for stability
+
+
 Code Optimization and Documentation - 02/06/26
 ================================================
 

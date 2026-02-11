@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Motor Controller
+Comment=Antenna Aligner Motor Controller - Control azimuth and elevation stepper motors
+Exec=/home/sd2-group2/Documents/SD2_Codespace/Antenna_Aligner/.venv/bin/python /home/sd2-group2/Documents/SD2_Codespace/Antenna_Aligner/scripts/motor_controller_gui.py
+Icon=applications-engineering
+Terminal=false
+Categories=Science;Education;Engineering;
+StartupNotify=true
+Path=/home/sd2-group2/Documents/SD2_Codespace/Antenna_Aligner/scripts
