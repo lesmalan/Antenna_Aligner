@@ -1,3 +1,94 @@
+Antenna Aligner Combined GUI - 02/17/26
+=========================================
+
+1. Integrated VNA + Motor Control GUI (antenna_aligner_gui.py)
+   - Created comprehensive GUI combining VNA monitoring with motor control
+   - Features:
+     * Dual connection management: VNA (TCP/IP) and Arduino (Serial)
+     * Frequency monitoring modes:
+       - Single frequency: Monitor specific frequency (e.g., 977 MHz)
+       - Frequency range: Track peak amplitude across frequency range
+     * Three scan modes:
+       - Azimuth Sweep (1D): Horizontal rotation at fixed elevation
+       - Elevation Sweep (1D): Vertical tilt at current azimuth
+       - 2D Grid Scan: Complete azimuth × elevation mapping with heatmap
+     * Manual motor control:
+       - Azimuth: CCW/CW buttons with configurable step size
+       - Elevation: Down/Up buttons with configurable step size
+       - Real-time position display (Az, El)
+       - Home button for (0, 0) return
+       - Emergency stop function
+     * Automated scanning:
+       - Configurable start/stop positions and step size for both axes
+       - Adjustable measurement delay for settling time
+       - Real-time data acquisition and plotting
+       - Scan mode automatically enables/disables relevant parameters
+     * Real-time visualization:
+       - 1D line plots for azimuth/elevation scans
+       - 2D heatmap for grid scans with colorbar
+       - Automatic peak detection and marking
+       - Data point counter and scan mode display
+     * Data export:
+       - Save scan data to CSV (azimuth, elevation, amplitude)
+       - Automatic plot export to PNG (line or heatmap)
+       - Timestamped filenames with scan mode identifier
+     * Activity logging with timestamps
+     * Status indicators for scan progress
+   
+2. Operating Modes:
+   - Single Frequency Mode: Fast monitoring at known transmitter frequency
+   - Range Peak Tracking: Robust to frequency drift, tracks maximum across range
+   - Azimuth Scan: Characterize horizontal radiation pattern
+   - Elevation Scan: Characterize vertical radiation pattern
+   - 2D Grid Scan: Complete 3D pattern visualization via heatmap
+   
+3. Scan Workflow:
+   - Connect to VNA and motor controller
+   - Configure frequency (single or range)
+   - Optionally use manual controls to pre-position antenna
+   - Select scan mode (azimuth, elevation, or 2D)
+   - Set scan parameters (start, stop, step, delay)
+   - Execute automated scan: Move → Wait → Measure → Record → Plot
+   - Export results to CSV and PNG
+   
+4. Desktop Launcher (Antenna_Aligner.desktop)
+   - Desktop shortcut for easy access
+   - Uses virtual environment Python interpreter
+   - Icon: applications-science
+   - Categories: Science, Education, Engineering
+
+5. Documentation Updates:
+   - README_antenna_aligner.md: Comprehensive user guide
+     * Added manual control section
+     * Documented all three scan modes with use cases
+     * Updated data format to include elevation column
+     * Enhanced troubleshooting guide
+   - QUICKSTART_antenna_aligner.txt: Quick reference card
+     * Added manual control quick reference
+     * Documented scan mode selection
+     * Provided example configurations for all modes
+     * Updated output file format
+
+6. Technical Implementation:
+   - Threading for non-blocking scans
+   - Matplotlib TkAgg backend for GUI integration
+   - Error handling for connection and measurement failures
+   - Automatic VNA reconfiguration based on frequency mode
+   - Position tracking from Arduino STATUS command
+   - Dynamic UI element enabling/disabling based on scan mode
+   - Support for 2D numpy arrays and heatmap generation
+   - Raster scan pattern for 2D grid (row-by-row)
+
+7. Use Cases:
+   - Antenna radiation pattern characterization (1D and 2D)
+   - Optimal receiver orientation determination (azimuth and elevation)
+   - Signal strength vs. angle analysis
+   - Directivity measurements
+   - Beam width determination (horizontal and vertical)
+   - Comparative testing of different antenna positions
+   - Full spherical pattern approximation via grid scan
+
+
 Motor Controller Development - 02/11/26
 =========================================
 
