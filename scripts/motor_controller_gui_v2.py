@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
-GUI for Antenna Aligner Motor Controller
+GUI for Antenna Aligner Motor Controller V2 (Degree-based)
 Controls azimuth and elevation stepper motors via Arduino
+Movement inputs/outputs are in DEGREES instead of steps
+Conversion: 200 steps = 360 degrees (1 step = 1.8 degrees)
 """
 import tkinter as tk
 from tkinter import ttk, messagebox
@@ -13,9 +15,15 @@ from datetime import datetime
 
 
 class MotorControllerGUI:
+    # Conversion constants
+    STEPS_PER_REV = 200
+    DEGREES_PER_REV = 360
+    STEPS_PER_DEGREE = STEPS_PER_REV / DEGREES_PER_REV  # 0.5556
+    DEGREES_PER_STEP = DEGREES_PER_REV / STEPS_PER_REV  # 1.8
+    
     def __init__(self, root):
         self.root = root
-        self.root.title("Antenna Aligner Motor Controller")
+        self.root.title("Antenna Aligner Motor Controller V2 (Degrees)")
         self.root.geometry("650x700")
         
         # Serial connection
@@ -27,15 +35,15 @@ class MotorControllerGUI:
         self.baudrate = tk.IntVar(value=115200)
         self.motor_speed = tk.IntVar(value=30)
         
-        # Position tracking
-        self.current_az = tk.StringVar(value="0")
-        self.current_el = tk.StringVar(value="0")
+        # Position tracking (displayed in degrees)
+        self.current_az = tk.StringVar(value="0.0")
+        self.current_el = tk.StringVar(value="0.0")
         
-        # Movement controls
-        self.az_steps = tk.IntVar(value=10)
-        self.el_steps = tk.IntVar(value=10)
-        self.az_target = tk.IntVar(value=0)
-        self.el_target = tk.IntVar(value=0)
+        # Movement controls (in degrees)
+        self.az_degrees = tk.DoubleVar(value=18.0)  # 10 steps = 18 degrees
+        self.el_degrees = tk.DoubleVar(value=18.0)
+        self.az_target = tk.DoubleVar(value=0.0)
+        self.el_target = tk.DoubleVar(value=0.0)
         
         # Status monitoring
         self.auto_update_status = tk.BooleanVar(value=True)
@@ -48,6 +56,14 @@ class MotorControllerGUI:
         # Auto-connect after GUI is ready
         self.root.after(500, self.auto_connect)
     
+    def degrees_to_steps(self, degrees):
+        """Convert degrees to steps."""
+        return round(degrees * self.STEPS_PER_DEGREE)
+    
+    def steps_to_degrees(self, steps):
+        """Convert steps to degrees."""
+        return steps * self.DEGREES_PER_STEP
+    
     def create_widgets(self):
         # Main container
         main_frame = ttk.Frame(self.root, padding="10")
@@ -56,9 +72,15 @@ class MotorControllerGUI:
         row = 0
         
         # Title
-        title = ttk.Label(main_frame, text="Antenna Aligner Motor Controller", 
+        title = ttk.Label(main_frame, text="Antenna Aligner Motor Controller V2", 
                          font=("Arial", 16, "bold"))
-        title.grid(row=row, column=0, columnspan=3, pady=(0, 15))
+        title.grid(row=row, column=0, columnspan=3, pady=(0, 5))
+        row += 1
+        
+        # Subtitle
+        subtitle = ttk.Label(main_frame, text="(Degree-based controls)", 
+                           font=("Arial", 10, "italic"), foreground="gray")
+        subtitle.grid(row=row, column=0, columnspan=3, pady=(0, 10))
         row += 1
         
         # Connection Frame
@@ -92,13 +114,13 @@ class MotorControllerGUI:
         az_display = ttk.Label(status_frame, textvariable=self.current_az, 
                               font=("Arial", 14), foreground="blue")
         az_display.grid(row=0, column=1, sticky=tk.W, pady=5, padx=5)
-        ttk.Label(status_frame, text="steps").grid(row=0, column=2, sticky=tk.W, pady=5)
+        ttk.Label(status_frame, text="°").grid(row=0, column=2, sticky=tk.W, pady=5)
         
         ttk.Label(status_frame, text="Elevation:", font=("Arial", 12, "bold")).grid(row=1, column=0, sticky=tk.W, pady=5, padx=5)
         el_display = ttk.Label(status_frame, textvariable=self.current_el, 
                               font=("Arial", 14), foreground="blue")
         el_display.grid(row=1, column=1, sticky=tk.W, pady=5, padx=5)
-        ttk.Label(status_frame, text="steps").grid(row=1, column=2, sticky=tk.W, pady=5)
+        ttk.Label(status_frame, text="°").grid(row=1, column=2, sticky=tk.W, pady=5)
         
         ttk.Checkbutton(status_frame, text="Auto-update status", 
                        variable=self.auto_update_status,
@@ -107,7 +129,7 @@ class MotorControllerGUI:
         ttk.Button(status_frame, text="Refresh Status", 
                   command=self.update_status).grid(row=2, column=2, pady=5)
         
-        ttk.Label(status_frame, text="⚠ Elevation limits: -20 to +20 steps", 
+        ttk.Label(status_frame, text="⚠ Elevation limits: -36° to +36°", 
                  foreground="red", font=('Arial', 9)).grid(row=3, column=0, columnspan=3, pady=(5, 0))
         
         # Motor Settings Frame
@@ -125,28 +147,28 @@ class MotorControllerGUI:
         settings_frame.columnconfigure(1, weight=1)
         
         # Relative Movement Frame
-        rel_frame = ttk.LabelFrame(main_frame, text="Relative Movement (Steps)", padding="10")
+        rel_frame = ttk.LabelFrame(main_frame, text="Relative Movement (Degrees)", padding="10")
         rel_frame.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=5)
         row += 1
         
         # Azimuth relative controls
         ttk.Label(rel_frame, text="Azimuth:").grid(row=0, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(rel_frame, textvariable=self.az_steps, width=10).grid(row=0, column=1, pady=5, padx=5)
+        ttk.Entry(rel_frame, textvariable=self.az_degrees, width=10).grid(row=0, column=1, pady=5, padx=5)
         ttk.Button(rel_frame, text="← CCW", 
-                  command=lambda: self.move_relative('az', -self.az_steps.get())).grid(row=0, column=2, pady=5, padx=2)
+                  command=lambda: self.move_relative('az', -self.az_degrees.get())).grid(row=0, column=2, pady=5, padx=2)
         ttk.Button(rel_frame, text="CW →", 
-                  command=lambda: self.move_relative('az', self.az_steps.get())).grid(row=0, column=3, pady=5, padx=2)
+                  command=lambda: self.move_relative('az', self.az_degrees.get())).grid(row=0, column=3, pady=5, padx=2)
         
         # Elevation relative controls
         ttk.Label(rel_frame, text="Elevation:").grid(row=1, column=0, sticky=tk.W, pady=5)
-        ttk.Entry(rel_frame, textvariable=self.el_steps, width=10).grid(row=1, column=1, pady=5, padx=5)
+        ttk.Entry(rel_frame, textvariable=self.el_degrees, width=10).grid(row=1, column=1, pady=5, padx=5)
         ttk.Button(rel_frame, text="↓ Down", 
-                  command=lambda: self.move_relative('el', -self.el_steps.get())).grid(row=1, column=2, pady=5, padx=2)
+                  command=lambda: self.move_relative('el', -self.el_degrees.get())).grid(row=1, column=2, pady=5, padx=2)
         ttk.Button(rel_frame, text="↑ Up", 
-                  command=lambda: self.move_relative('el', self.el_steps.get())).grid(row=1, column=3, pady=5, padx=2)
+                  command=lambda: self.move_relative('el', self.el_degrees.get())).grid(row=1, column=3, pady=5, padx=2)
         
         # Absolute Movement Frame
-        abs_frame = ttk.LabelFrame(main_frame, text="Absolute Position (Steps)", padding="10")
+        abs_frame = ttk.LabelFrame(main_frame, text="Absolute Position (Degrees)", padding="10")
         abs_frame.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=5)
         row += 1
         
@@ -166,7 +188,7 @@ class MotorControllerGUI:
         actions_frame.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=5)
         row += 1
         
-        ttk.Button(actions_frame, text="Home (0, 0)", 
+        ttk.Button(actions_frame, text="Home (0°, 0°)", 
                   command=self.home, width=15).grid(row=0, column=0, pady=5, padx=5)
         ttk.Button(actions_frame, text="Set as Home", 
                   command=self.calibrate_home, width=15).grid(row=0, column=1, pady=5, padx=5)
@@ -194,7 +216,8 @@ class MotorControllerGUI:
         main_frame.columnconfigure(0, weight=1)
         main_frame.rowconfigure(row-1, weight=1)
         
-        self.log("GUI initialized. Connect to Arduino to begin.")
+        self.log("GUI initialized (V2 - Degree mode). Connect to Arduino to begin.")
+        self.log(f"Conversion: 200 steps = 360°, 1 step = {self.DEGREES_PER_STEP}°")
     
     def log(self, message):
         """Add timestamped message to log."""
@@ -228,7 +251,7 @@ class MotorControllerGUI:
         """Prompt user to calibrate home position."""
         if messagebox.askyesno("Home Calibration", 
                                "Is the receiver currently at the horizontal home position?\n\n"
-                               "Click 'Yes' to set this as home (0, 0).\n"
+                               "Click 'Yes' to set this as home (0°, 0°).\n"
                                "Click 'No' to manually adjust first."):
             self.calibrate_home()
     
@@ -291,12 +314,17 @@ class MotorControllerGUI:
         response = self.send_command("STATUS")
         if response and response.startswith("POS"):
             try:
-                # Parse: "POS AZ:123 EL:456"
+                # Parse: "POS AZ:123 EL:456" (in steps)
                 parts = response.split()
-                az = parts[1].split(':')[1]
-                el = parts[2].split(':')[1]
-                self.current_az.set(az)
-                self.current_el.set(el)
+                az_steps = int(parts[1].split(':')[1])
+                el_steps = int(parts[2].split(':')[1])
+                
+                # Convert to degrees for display
+                az_degrees = self.steps_to_degrees(az_steps)
+                el_degrees = self.steps_to_degrees(el_steps)
+                
+                self.current_az.set(f"{az_degrees:.1f}")
+                self.current_el.set(f"{el_degrees:.1f}")
             except (IndexError, ValueError) as e:
                 self.log(f"Error parsing status: {response}")
     
@@ -321,35 +349,40 @@ class MotorControllerGUI:
             self.root.after(0, self.update_status)
             time.sleep(1)  # Update every second
     
-    def move_relative(self, axis, steps):
-        """Move motor by relative steps."""
+    def move_relative(self, axis, degrees):
+        """Move motor by relative degrees (converted to steps)."""
+        steps = self.degrees_to_steps(degrees)
+        
         if axis == 'az':
             response = self.send_command(f"AZ {steps}")
-            self.log(f"Azimuth move: {steps} steps → {response}")
+            self.log(f"Azimuth move: {degrees:.1f}° ({steps} steps) → {response}")
         else:
             response = self.send_command(f"EL {steps}")
-            self.log(f"Elevation move: {steps} steps → {response}")
+            self.log(f"Elevation move: {degrees:.1f}° ({steps} steps) → {response}")
         
         if response and response.startswith("OK"):
             # Update status after movement
             self.root.after(100, self.update_status)
     
     def goto_position(self):
-        """Move to absolute position."""
-        az_target = self.az_target.get()
-        el_target = self.el_target.get()
+        """Move to absolute position (degrees converted to steps)."""
+        az_degrees = self.az_target.get()
+        el_degrees = self.el_target.get()
         
-        response1 = self.send_command(f"AZABS {az_target}")
-        self.log(f"Azimuth to {az_target}: {response1}")
+        az_steps = self.degrees_to_steps(az_degrees)
+        el_steps = self.degrees_to_steps(el_degrees)
         
-        response2 = self.send_command(f"ELABS {el_target}")
-        self.log(f"Elevation to {el_target}: {response2}")
+        response1 = self.send_command(f"AZABS {az_steps}")
+        self.log(f"Azimuth to {az_degrees:.1f}° ({az_steps} steps): {response1}")
+        
+        response2 = self.send_command(f"ELABS {el_steps}")
+        self.log(f"Elevation to {el_degrees:.1f}° ({el_steps} steps): {response2}")
         
         # Update status after movement
         self.root.after(100, self.update_status)
     
     def home(self):
-        """Return to home position (0, 0)."""
+        """Return to home position (0°, 0°)."""
         response = self.send_command("HOME")
         self.log(f"Homing → {response}")
         
@@ -357,16 +390,16 @@ class MotorControllerGUI:
             self.root.after(100, self.update_status)
     
     def calibrate_home(self):
-        """Set current position as new home (0, 0)."""
+        """Set current position as new home (0°, 0°)."""
         if messagebox.askyesno("Calibrate Home", 
-                               "Set the current position as the new home (0, 0)?\n\n"
+                               "Set the current position as the new home (0°, 0°)?\n\n"
                                "This will reset the position counters to zero."):
             response = self.send_command("SETZERO")
             self.log(f"Calibrate home → {response}")
             
             if response and response.startswith("OK"):
-                self.current_az.set("0")
-                self.current_el.set("0")
+                self.current_az.set("0.0")
+                self.current_el.set("0.0")
                 self.root.after(100, self.update_status)
     
     def set_speed(self):

@@ -178,6 +178,11 @@ void processCommand(String command) {
   if (command == "SETZERO") {
     azimuthPosition = 0;
     elevationPosition = 0;
+    // Engage motors with holding torque by doing a small movement and back
+    azimuthMotor->step(1, FORWARD, MICROSTEP);
+    azimuthMotor->step(1, BACKWARD, MICROSTEP);
+    elevationMotor->step(1, FORWARD, MICROSTEP);
+    elevationMotor->step(1, BACKWARD, MICROSTEP);
     Serial.println("OK SETZERO - Current position set as home (0, 0)");
     return;
   }
@@ -287,8 +292,8 @@ void moveElevation(long steps) {
     return;
   }
   
-  // Determine direction
-  uint8_t direction = (steps > 0) ? FORWARD : BACKWARD;
+  // Determine direction (reversed: positive = BACKWARD = up, negative = FORWARD = down)
+  uint8_t direction = (steps > 0) ? BACKWARD : FORWARD;
   long absSteps = abs(steps);
   
   // Move motor
