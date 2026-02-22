@@ -37,9 +37,9 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0D47A1),
+          seedColor: const Color(0xFF1B5E20), // Dark green
           brightness: Brightness.light,
-        ),
+        ).copyWith(secondary: const Color(0xFFFF8F00)), // Deep amber
         appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
       ),
       home: const AlignmentPage(),
@@ -70,6 +70,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
   int _azimuthTurnsToMaxRSL =
       0; // Calculated: how many turns left to reach max RSL
   bool _isRecordingAzimuth = false; // Flag: continuously recording azimuth data
+  bool _azimuthTurnbucklesSubmitted =
+      false; // Flag: user has submitted turnbuckle count
 
   // Elevation sweep data collection
   ElevationPhase _elevationPhase = ElevationPhase.waitingForStart;
@@ -82,6 +84,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
       0; // Calculated: how many turns down from top to reach max RSL
   bool _isRecordingElevation =
       false; // Flag: continuously recording elevation data
+  bool _elevationTurnbucklesSubmitted =
+      false; // Flag: user has submitted turnbuckle count
 
   // Signal data from Raspberry Pi
   double _currentRSL = -85.5; // dBm
@@ -282,9 +286,12 @@ class _AlignmentPageState extends State<AlignmentPage> {
           break;
         case OverrideView.alignment:
           _azimuthPhase = AzimuthPhase.aligned;
-          _elevationPhase = ElevationPhase.aligned;
+          _elevationPhase = ElevationPhase.waitingForStart;
+          _azimuthConfirmed = true;
+          _elevationConfirmed = false;
           _processCompleted = false;
-          _currentStep = AlignmentStep.azimuth;
+          _currentStep = AlignmentStep.elevation;
+          _seedAzimuthDemoData();
           break;
         case OverrideView.completed:
           _azimuthPhase = AzimuthPhase.aligned;
@@ -301,8 +308,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
       ..clear()
       ..addAll(const [-95.0, -92.0, -90.5, -88.0, -86.0, -84.0, -83.0, -84.5]);
     _azimuthMaxSweepRSL = _azimuthSweepRSLData.reduce(max);
-    _azimuthTurnbucklesInSweep = 0;
-    _azimuthTurnsToMaxRSL = 0;
+    _azimuthTurnbucklesInSweep = 8;
+    _azimuthTurnsToMaxRSL = 6;
+    _azimuthTurnbucklesSubmitted = true;
   }
 
   void _seedElevationDemoData() {
@@ -310,8 +318,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
       ..clear()
       ..addAll(const [-96.0, -94.0, -91.0, -89.5, -87.0, -85.0, -84.0, -83.5]);
     _elevationMaxSweepRSL = _elevationSweepRSLData.reduce(max);
-    _elevationTurnbucklesInSweep = 0;
-    _elevationTurnsFromTopToMax = 0;
+    _elevationTurnbucklesInSweep = 6;
+    _elevationTurnsFromTopToMax = 2;
+    _elevationTurnbucklesSubmitted = true;
   }
 
   void _disableOverride() {
@@ -482,7 +491,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
               end: Alignment.bottomRight,
               colors: [
                 Theme.of(context).colorScheme.primary,
-                Colors.blue[900]!,
+                Colors.green[900]!,
               ],
             ),
           ),
@@ -619,7 +628,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   children: [
                     Icon(
                       _isConnected ? Icons.cloud_done : Icons.cloud_off,
-                      color: _isConnected ? Colors.green[300] : Colors.red[300],
+                      color: _isConnected ? Colors.green[500] : Colors.red[300],
                       size: 20,
                     ),
                     const SizedBox(width: 4),
@@ -733,11 +742,11 @@ class _AlignmentPageState extends State<AlignmentPage> {
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
-                      color: Colors.blue[50],
+                      color: Colors.amber[100],
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.info, size: 40, color: Colors.blue),
+                          Icon(Icons.info, size: 40, color: Colors.amber[700]),
                           const SizedBox(height: 12),
                           Text(
                             'Azimuth Sweep in Progress - Side $_currentSide',
@@ -916,8 +925,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.green[50],
-                          border: Border.all(color: Colors.green[300]!),
+                          color: Colors.green[100],
+                          border: Border.all(color: Colors.green[500]!),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
@@ -976,12 +985,17 @@ class _AlignmentPageState extends State<AlignmentPage> {
                         keyboardType: TextInputType.number,
                         onChanged: (value) {
                           setState(() {
-                            _azimuthTurnbucklesInSweep =
-                                int.tryParse(value) ?? 0;
+                            final parsed = int.tryParse(value) ?? 0;
+                            _azimuthTurnbucklesInSweep = parsed > 0
+                                ? parsed
+                                : 0;
                           });
                         },
                         decoration: InputDecoration(
-                          hintText: 'Enter number of turnbuckles',
+                          hintText: 'Enter number of turnbuckles (minimum 1)',
+                          errorText: _azimuthTurnbucklesInSweep == 0
+                              ? null
+                              : null,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -993,12 +1007,31 @@ class _AlignmentPageState extends State<AlignmentPage> {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      if (_azimuthTurnbucklesInSweep > 0) ...[
+                      if (_azimuthTurnbucklesInSweep > 0 &&
+                          !_azimuthTurnbucklesSubmitted) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _submitAzimuthTurnbuckles,
+                            icon: const Icon(Icons.check),
+                            label: const Text('Submit'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amber[800],
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (_azimuthTurnbucklesSubmitted) ...[
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.blue[50],
-                            border: Border.all(color: Colors.blue[300]!),
+                            color: Colors.amber[100],
+                            border: Border.all(color: Colors.amber[500]!),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Column(
@@ -1045,7 +1078,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                       ),
                                       TextSpan(
                                         text:
-                                            '$_azimuthTurnbucklesInSweep turnbuckles',
+                                            '$_azimuthTurnsToMaxRSL turnbuckles',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: Colors.orange,
@@ -1141,11 +1174,11 @@ class _AlignmentPageState extends State<AlignmentPage> {
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
-                      color: Colors.blue[50],
+                      color: Colors.amber[100],
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.info, size: 40, color: Colors.blue),
+                          Icon(Icons.info, size: 40, color: Colors.amber[700]),
                           const SizedBox(height: 12),
                           Text(
                             'Elevation Sweep in Progress - Side $_currentSide',
@@ -1324,8 +1357,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.green[50],
-                          border: Border.all(color: Colors.green[300]!),
+                          color: Colors.green[100],
+                          border: Border.all(color: Colors.green[500]!),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
@@ -1384,12 +1417,17 @@ class _AlignmentPageState extends State<AlignmentPage> {
                         keyboardType: TextInputType.number,
                         onChanged: (value) {
                           setState(() {
-                            _elevationTurnbucklesInSweep =
-                                int.tryParse(value) ?? 0;
+                            final parsed = int.tryParse(value) ?? 0;
+                            _elevationTurnbucklesInSweep = parsed > 0
+                                ? parsed
+                                : 0;
                           });
                         },
                         decoration: InputDecoration(
-                          hintText: 'Enter number of turnbuckles',
+                          hintText: 'Enter number of turnbuckles (minimum 1)',
+                          errorText: _elevationTurnbucklesInSweep == 0
+                              ? null
+                              : null,
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                           ),
@@ -1401,12 +1439,31 @@ class _AlignmentPageState extends State<AlignmentPage> {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      if (_elevationTurnbucklesInSweep > 0) ...[
+                      if (_elevationTurnbucklesInSweep > 0 &&
+                          !_elevationTurnbucklesSubmitted) ...[
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _submitElevationTurnbuckles,
+                            icon: const Icon(Icons.check),
+                            label: const Text('Submit'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.amber[800],
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (_elevationTurnbucklesSubmitted) ...[
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.blue[50],
-                            border: Border.all(color: Colors.blue[300]!),
+                            color: Colors.amber[100],
+                            border: Border.all(color: Colors.amber[500]!),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Column(
@@ -1613,9 +1670,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
             Text(
               _currentStep == AlignmentStep.azimuth
                   ? 'Step 1: Azimuth Alignment'
-                  : _currentStep == AlignmentStep.elevation
-                  ? 'Step 2: Elevation Alignment'
-                  : 'All Alignments Complete',
+                  : 'Step 2: Elevation Alignment',
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: Theme.of(context).colorScheme.primary,
@@ -1623,24 +1678,23 @@ class _AlignmentPageState extends State<AlignmentPage> {
             ),
             const SizedBox(height: 12),
 
-            // Azimuth Information
-            _buildAlignmentCard(
-              title: 'Azimuth',
-              turnsLeft: _azimuthTurnsLeft,
-              turnsRight: _azimuthTurnsRight,
-              isActive: _currentStep == AlignmentStep.azimuth,
-              isConfirmed: _azimuthConfirmed,
-            ),
-            const SizedBox(height: 8),
-
-            // Elevation Information
-            _buildAlignmentCard(
-              title: 'Elevation',
-              turnsLeft: _elevationTurnsLeft,
-              turnsRight: _elevationTurnsRight,
-              isActive: _currentStep == AlignmentStep.elevation,
-              isConfirmed: _elevationConfirmed,
-            ),
+            // Show only the relevant alignment card based on current step
+            if (_currentStep == AlignmentStep.azimuth)
+              _buildAlignmentCard(
+                title: 'Azimuth',
+                turnsLeft: _azimuthTurnsLeft,
+                turnsRight: _azimuthTurnsRight,
+                isActive: true,
+                isConfirmed: _azimuthConfirmed,
+              ),
+            if (_currentStep == AlignmentStep.elevation)
+              _buildAlignmentCard(
+                title: 'Elevation',
+                turnsLeft: _elevationTurnsLeft,
+                turnsRight: _elevationTurnsRight,
+                isActive: true,
+                isConfirmed: _elevationConfirmed,
+              ),
           ],
         ),
       ),
@@ -1656,7 +1710,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: isActive ? Colors.blue[50] : Colors.white,
+        color: isActive ? Colors.green[100] : Colors.white,
         border: Border.all(
           color: isConfirmed
               ? Colors.green[600]!
@@ -1738,7 +1792,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 icon: const Icon(Icons.arrow_forward),
                 label: const Text('Start Elevation Sweep'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue[700],
+                  backgroundColor: Colors.green[700],
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 32,
@@ -1760,6 +1814,11 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _elevationPhase = ElevationPhase.sweepInProgress;
       _elevationSweepRSLData.clear();
       _elevationMaxSweepRSL = -100.0;
+      _elevationTurnbucklesSubmitted = false;
+      // Seed demo data when in debug mode
+      if (_overrideMode) {
+        _seedElevationDemoData();
+      }
     });
   }
 
@@ -1799,6 +1858,43 @@ class _AlignmentPageState extends State<AlignmentPage> {
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  void _submitAzimuthTurnbuckles() {
+    if (_azimuthTurnbucklesInSweep > 0 && _azimuthSweepRSLData.isNotEmpty) {
+      // Find the index of max RSL in the sweep data
+      int maxIndex = _azimuthSweepRSLData.indexOf(_azimuthMaxSweepRSL);
+
+      // Calculate how many turnbuckles from the start (left) to the max
+      if (maxIndex >= 0) {
+        _azimuthTurnsToMaxRSL =
+            (maxIndex /
+                    _azimuthSweepRSLData.length *
+                    _azimuthTurnbucklesInSweep)
+                .round();
+      }
+
+      setState(() {
+        _azimuthTurnbucklesSubmitted = true;
+      });
+    }
+  }
+
+  void _submitElevationTurnbuckles() {
+    if (_elevationTurnbucklesInSweep > 0 && _elevationSweepRSLData.isNotEmpty) {
+      // Find the index of max RSL in the sweep data
+      int maxIndex = _elevationSweepRSLData.indexOf(_elevationMaxSweepRSL);
+
+      // Calculate how many turnbuckles down from the top to the max
+      if (maxIndex >= 0) {
+        _elevationTurnsFromTopToMax =
+            (_elevationSweepRSLData.length - maxIndex - 1);
+      }
+
+      setState(() {
+        _elevationTurnbucklesSubmitted = true;
+      });
+    }
   }
 
   void _confirmAzimuthAlignment() {
@@ -1918,6 +2014,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _azimuthTurnsToMaxRSL = 0;
       _azimuthConfirmed = false;
       _isRecordingAzimuth = false;
+      _azimuthTurnbucklesSubmitted = false;
       // Reset elevation state for side 2
       _elevationPhase = ElevationPhase.waitingForStart;
       _elevationSweepRSLData.clear();
@@ -1926,8 +2023,13 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _elevationTurnsFromTopToMax = 0;
       _elevationConfirmed = false;
       _isRecordingElevation = false;
+      _elevationTurnbucklesSubmitted = false;
       // Reset step
       _currentStep = AlignmentStep.azimuth;
+      // Seed demo data when in debug mode
+      if (_overrideMode) {
+        _seedAzimuthDemoData();
+      }
     });
   }
 
