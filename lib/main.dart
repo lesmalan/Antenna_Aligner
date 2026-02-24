@@ -583,28 +583,63 @@ class _AlignmentPageState extends State<AlignmentPage> {
             ),
           ),
           child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.check_circle, size: 120, color: Colors.white),
-                const SizedBox(height: 32),
-                Text(
-                  'Both sides aligned successfully!',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.check_circle,
+                    size: 120,
                     color: Colors.white,
-                    fontWeight: FontWeight.bold,
                   ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Please disconnect device from antenna.',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleMedium?.copyWith(color: Colors.white70),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+                  const SizedBox(height: 32),
+                  Text(
+                    'Alignment Finalized!',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Both Side 1 and Side 2 antennas have been successfully aligned.',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleMedium?.copyWith(color: Colors.white),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white54),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.link_off,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Disconnect from Side 2 antenna',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -1969,13 +2004,22 @@ class _AlignmentPageState extends State<AlignmentPage> {
           }
         });
 
-        _showConfirmationDialog(
-          title: 'Side 1 Complete',
+        _showSideCompleteDialog(
+          title: 'Side 1 Alignment Complete',
           message:
-              'Side 1 elevation alignment complete. From the TOP, go DOWN $_elevationTurnsFromTopToMax turnbuckles to reach maximum signal.\n\nNow proceeding to Side 2 alignment...',
+              'Side 1 azimuth and elevation alignment is complete.\n\n'
+              'From the TOP, go DOWN $_elevationTurnsFromTopToMax turnbuckles to reach maximum signal.',
+          disconnectMessage: 'Please DISCONNECT from Side 1 antenna now.',
+          nextAction:
+              'Connect to Side 2 antenna and tap "Continue" to proceed.',
+          showStartNewAlignment: true,
           onConfirm: () {
             Navigator.pop(context);
             _startSide2();
+          },
+          onStartNew: () {
+            Navigator.pop(context);
+            _resetAlignment();
           },
         );
       } else {
@@ -1991,10 +2035,14 @@ class _AlignmentPageState extends State<AlignmentPage> {
           }
         });
 
-        _showConfirmationDialog(
-          title: 'Side 2 Complete',
+        _showSideCompleteDialog(
+          title: 'Alignment Finalized',
           message:
-              'Side 2 elevation alignment complete. From the TOP, go DOWN $_elevationTurnsFromTopToMax turnbuckles to reach maximum signal.\n\nBoth sides are now aligned!',
+              'Side 2 azimuth and elevation alignment is complete.\n\n'
+              'From the TOP, go DOWN $_elevationTurnsFromTopToMax turnbuckles to reach maximum signal.',
+          disconnectMessage: 'Please DISCONNECT from Side 2 antenna now.',
+          nextAction: 'Both antennas are now fully aligned!',
+          showStartNewAlignment: false,
           onConfirm: () {
             Navigator.pop(context);
           },
@@ -2057,6 +2105,143 @@ class _AlignmentPageState extends State<AlignmentPage> {
         ],
       ),
     );
+  }
+
+  void _showSideCompleteDialog({
+    required String title,
+    required String message,
+    required String disconnectMessage,
+    required String nextAction,
+    required VoidCallback onConfirm,
+    bool showStartNewAlignment = false,
+    VoidCallback? onStartNew,
+  }) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green[600], size: 28),
+            const SizedBox(width: 12),
+            Expanded(child: Text(title)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(message),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange[50],
+                border: Border.all(color: Colors.orange[300]!),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.link_off, color: Colors.orange[700], size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      disconnectMessage,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange[900],
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                border: Border.all(color: Colors.blue[300]!),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.arrow_forward, color: Colors.blue[700], size: 24),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      nextAction,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w500,
+                        color: Colors.blue[900],
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          if (showStartNewAlignment && onStartNew != null)
+            TextButton.icon(
+              onPressed: onStartNew,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Start New Alignment'),
+              style: TextButton.styleFrom(foregroundColor: Colors.grey[700]),
+            ),
+          ElevatedButton.icon(
+            onPressed: onConfirm,
+            icon: const Icon(Icons.check),
+            label: const Text('Continue'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green[600],
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _resetAlignment() {
+    setState(() {
+      // Reset all state to start over
+      _currentSide = 1;
+      _side1Complete = false;
+      _processCompleted = false;
+      _currentStep = AlignmentStep.azimuth;
+
+      // Reset azimuth state
+      _azimuthPhase = AzimuthPhase.sweepInProgress;
+      _azimuthSweepRSLData.clear();
+      _azimuthMaxSweepRSL = -100.0;
+      _azimuthTurnbucklesInSweep = 0;
+      _azimuthTurnsToMaxRSL = 0;
+      _azimuthConfirmed = false;
+      _isRecordingAzimuth = false;
+      _azimuthTurnbucklesSubmitted = false;
+
+      // Reset elevation state
+      _elevationPhase = ElevationPhase.waitingForStart;
+      _elevationSweepRSLData.clear();
+      _elevationMaxSweepRSL = -100.0;
+      _elevationTurnbucklesInSweep = 0;
+      _elevationTurnsFromTopToMax = 0;
+      _elevationConfirmed = false;
+      _isRecordingElevation = false;
+      _elevationTurnbucklesSubmitted = false;
+
+      // Reset override mode
+      if (_overrideMode) {
+        _overrideView = OverrideView.azimuthSweep;
+        _seedAzimuthDemoData();
+      }
+    });
   }
 
   // Support helpline prompt: displays the support phone number to call
