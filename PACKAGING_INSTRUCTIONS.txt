@@ -1,0 +1,211 @@
+================================================================================
+                  ANTENNA ALIGNER APP - PACKAGING INSTRUCTIONS
+================================================================================
+
+This guide explains how to build and package the Flutter app for deployment
+to various devices and platforms.
+
+================================================================================
+                              PREREQUISITES
+================================================================================
+
+1. Flutter SDK installed and in PATH
+   - Verify with: flutter --version
+   - Minimum SDK version: 3.10.7
+
+2. Run these commands before building:
+   flutter clean
+   flutter pub get
+
+3. Check your environment:
+   flutter doctor
+
+================================================================================
+                              ANDROID
+================================================================================
+
+--- Debug APK (for testing) ---
+   flutter build apk --debug
+
+   Output: build\app\outputs\flutter-apk\app-debug.apk
+
+--- Release APK (for distribution) ---
+   flutter build apk --release
+
+   Output: build\app\outputs\flutter-apk\app-release.apk
+
+--- Split APKs by ABI (smaller file sizes) ---
+   flutter build apk --split-per-abi
+
+   Output: build\app\outputs\flutter-apk\
+           - app-armeabi-v7a-release.apk  (older 32-bit devices)
+           - app-arm64-v8a-release.apk    (most modern phones)
+           - app-x86_64-release.apk       (emulators, rare devices)
+
+--- App Bundle (for Play Store upload) ---
+   flutter build appbundle --release
+
+   Output: build\app\outputs\bundle\release\app-release.aab
+
+--- Installing to Android Device ---
+   1. Enable "Developer Options" and "USB Debugging" on device
+   2. Connect device via USB
+   3. Run: flutter install
+   Or manually: adb install build\app\outputs\flutter-apk\app-release.apk
+
+================================================================================
+                                iOS
+================================================================================
+
+NOTE: Building for iOS requires macOS with Xcode installed.
+
+--- Build iOS App ---
+   flutter build ios --release
+
+--- For TestFlight/App Store ---
+   1. Open ios/Runner.xcworkspace in Xcode
+   2. Select "Any iOS Device" as build target
+   3. Product > Archive
+   4. Use Organizer to upload to App Store Connect
+
+--- Ad-Hoc Distribution ---
+   1. Create an Ad-Hoc provisioning profile in Apple Developer Portal
+   2. Configure signing in Xcode
+   3. Archive and export IPA for Ad-Hoc distribution
+
+================================================================================
+                               WINDOWS
+================================================================================
+
+--- Build Windows Executable ---
+   flutter build windows --release
+
+   Output: build\windows\x64\runner\Release\
+
+   The entire Release folder contents are needed for distribution:
+   - sd2_losapp.exe (main executable)
+   - flutter_windows.dll
+   - data\ folder
+   - Other DLL dependencies
+
+--- Creating an Installer (optional) ---
+   Use tools like:
+   - Inno Setup (free): https://jrsoftware.org/isinfo.php
+   - NSIS: https://nsis.sourceforge.io/
+   - MSIX packaging (Microsoft Store)
+
+   For MSIX:
+   flutter pub add msix
+   flutter pub run msix:create
+
+================================================================================
+                                LINUX
+================================================================================
+
+--- Build Linux App ---
+   flutter build linux --release
+
+   Output: build/linux/x64/release/bundle/
+
+--- Distribution Options ---
+   1. Distribute the bundle folder as-is (tar.gz archive)
+   2. Create a Debian package (.deb)
+   3. Create a Snap package
+   4. Create an AppImage
+
+--- Creating a tar.gz Archive ---
+   cd build/linux/x64/release
+   tar -czvf antenna_aligner_linux.tar.gz bundle/
+
+================================================================================
+                                macOS
+================================================================================
+
+NOTE: Building for macOS requires macOS with Xcode installed.
+
+--- Build macOS App ---
+   flutter build macos --release
+
+   Output: build/macos/Build/Products/Release/sd2_losapp.app
+
+--- Creating a DMG for Distribution ---
+   1. Use create-dmg tool: brew install create-dmg
+   2. create-dmg build/macos/Build/Products/Release/sd2_losapp.app
+
+--- For Mac App Store ---
+   1. Open macos/Runner.xcworkspace in Xcode
+   2. Archive and submit via App Store Connect
+
+================================================================================
+                                 WEB
+================================================================================
+
+--- Build Web App ---
+   flutter build web --release
+
+   Output: build/web/
+
+--- Deployment Options ---
+   1. Copy contents of build/web/ to any web server
+   2. Deploy to Firebase Hosting:
+      firebase deploy --only hosting
+   3. Deploy to GitHub Pages, Netlify, Vercel, etc.
+
+--- With Custom Base Path (for subdirectory hosting) ---
+   flutter build web --base-href "/your-path/"
+
+================================================================================
+                         DIRECT DEVICE INSTALLATION
+================================================================================
+
+--- Run Directly on Connected Device ---
+   flutter run -d <device_id>
+
+   Get device list with: flutter devices
+
+--- Android Wireless Debugging ---
+   1. Enable wireless debugging on device
+   2. adb pair <ip>:<port>
+   3. adb connect <ip>:<port>
+   4. flutter run
+
+================================================================================
+                            SIGNING (RELEASE)
+================================================================================
+
+--- Android Release Signing ---
+   1. Generate keystore:
+      keytool -genkey -v -keystore upload-keystore.jks -keyalg RSA ^
+              -keysize 2048 -validity 10000 -alias upload
+
+   2. Create android/key.properties:
+      storePassword=<password>
+      keyPassword=<password>
+      keyAlias=upload
+      storeFile=<path-to-keystore>
+
+   3. Reference in android/app/build.gradle.kts
+
+--- iOS/macOS Code Signing ---
+   Requires Apple Developer account and certificates configured in Xcode.
+
+================================================================================
+                              TROUBLESHOOTING
+================================================================================
+
+- "flutter: command not found"
+  Add Flutter to PATH or use full path to flutter binary
+
+- Build fails with dependency errors
+  Run: flutter clean && flutter pub get
+
+- Android SDK not found
+  Set ANDROID_HOME environment variable
+
+- iOS build fails
+  Run: cd ios && pod install && cd ..
+
+- Gradle build issues
+  Try: cd android && ./gradlew clean && cd ..
+
+================================================================================
