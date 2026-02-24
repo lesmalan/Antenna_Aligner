@@ -1,211 +1,360 @@
 ================================================================================
-                  ANTENNA ALIGNER APP - PACKAGING INSTRUCTIONS
+          ANTENNA ALIGNER APP - SIDELOADING / DIRECT INSTALL GUIDE
 ================================================================================
 
-This guide explains how to build and package the Flutter app for deployment
-to various devices and platforms.
+Step-by-step instructions for building and installing this Flutter app
+directly on Android and iOS devices WITHOUT using the App Store or Play Store.
 
 ================================================================================
                               PREREQUISITES
 ================================================================================
 
-1. Flutter SDK installed and in PATH
-   - Verify with: flutter --version
-   - Minimum SDK version: 3.10.7
+STEP 1: Verify Flutter Installation
+   Open a terminal/command prompt and run:
+   
+   flutter --version
+   
+   You should see Flutter 3.10.7 or higher. If not installed, download from:
+   https://docs.flutter.dev/get-started/install
 
-2. Run these commands before building:
+STEP 2: Verify Android/iOS Tooling
+   Run:
+   
+   flutter doctor
+   
+   Fix any issues shown (Android SDK, Xcode, etc.)
+
+STEP 3: Prepare the Project
+   Navigate to the project folder and run:
+   
+   cd c:\Dev\Antenna_Aligner
    flutter clean
    flutter pub get
 
-3. Check your environment:
-   flutter doctor
 
 ================================================================================
-                              ANDROID
+                     ANDROID - STEP BY STEP SIDELOADING
 ================================================================================
 
---- Debug APK (for testing) ---
-   flutter build apk --debug
+PART A: PREPARE YOUR ANDROID DEVICE
+-------------------------------------
 
-   Output: build\app\outputs\flutter-apk\app-debug.apk
+STEP 1: Enable Developer Options on your Android device
+   a) Go to Settings > About Phone
+   b) Find "Build Number" and tap it 7 times
+   c) You'll see "You are now a developer!"
 
---- Release APK (for distribution) ---
+STEP 2: Enable USB Debugging
+   a) Go to Settings > System > Developer Options
+      (or Settings > Developer Options on some devices)
+   b) Toggle ON "USB Debugging"
+   c) Toggle ON "Install via USB" (if present)
+
+STEP 3: Allow Unknown App Installation
+   a) Go to Settings > Security (or Privacy)
+   b) Enable "Install unknown apps" or "Unknown sources"
+   c) If prompted later, allow your file manager or browser to install APKs
+
+
+PART B: BUILD THE APK ON YOUR COMPUTER
+---------------------------------------
+
+STEP 1: Open terminal in project directory
+   cd c:\Dev\Antenna_Aligner
+
+STEP 2: Build the release APK
    flutter build apk --release
+   
+   Wait for build to complete (may take 1-5 minutes)
 
-   Output: build\app\outputs\flutter-apk\app-release.apk
+STEP 3: Locate the built APK
+   The APK file is at:
+   c:\Dev\Antenna_Aligner\build\app\outputs\flutter-apk\app-release.apk
+   
+   File size should be approximately 15-50 MB
 
---- Split APKs by ABI (smaller file sizes) ---
+
+PART C: INSTALL VIA USB CABLE (RECOMMENDED)
+--------------------------------------------
+
+STEP 1: Connect your Android device to your computer via USB
+
+STEP 2: On your phone, tap "Allow" when prompted for USB debugging access
+        Check "Always allow from this computer" for convenience
+
+STEP 3: Verify device is connected
+   flutter devices
+   
+   You should see your device listed (e.g., "Pixel 6 (mobile)")
+
+STEP 4: Install the APK directly
+   flutter install
+   
+   OR use ADB directly:
+   adb install build\app\outputs\flutter-apk\app-release.apk
+
+STEP 5: Find the app in your app drawer and launch it
+
+
+PART D: INSTALL WITHOUT USB (ALTERNATIVE METHODS)
+--------------------------------------------------
+
+Option 1: Transfer APK via File Sharing
+   a) Copy app-release.apk to your phone via:
+      - Google Drive / Dropbox / OneDrive
+      - Email (attach the APK)
+      - Bluetooth transfer
+      - Direct file transfer (MTP)
+   b) On your phone, open the APK file
+   c) Tap "Install" when prompted
+   d) If blocked, go to Settings and enable "Install unknown apps" for
+      the app you're using to open the APK
+
+Option 2: Wireless ADB (Advanced)
+   a) On phone: Settings > Developer Options > Wireless debugging > ON
+   b) Tap "Pair device with pairing code"
+   c) On computer:
+      adb pair <phone-ip>:<pairing-port>
+      (enter the pairing code when prompted)
+   d) Then connect:
+      adb connect <phone-ip>:<port>
+   e) Install:
+      adb install build\app\outputs\flutter-apk\app-release.apk
+
+
+PART E: BUILD SMALLER APKs (OPTIONAL)
+--------------------------------------
+
+If you want a smaller APK file for a specific device:
+
    flutter build apk --split-per-abi
+   
+This creates multiple APKs:
+   - app-arm64-v8a-release.apk  (~15MB) - Most modern phones (use this one)
+   - app-armeabi-v7a-release.apk        - Older 32-bit phones
+   - app-x86_64-release.apk             - Emulators only
 
-   Output: build\app\outputs\flutter-apk\
-           - app-armeabi-v7a-release.apk  (older 32-bit devices)
-           - app-arm64-v8a-release.apk    (most modern phones)
-           - app-x86_64-release.apk       (emulators, rare devices)
+Check your phone's architecture:
+   a) Install "CPU-Z" app or similar
+   b) Or run: adb shell getprop ro.product.cpu.abi
 
---- App Bundle (for Play Store upload) ---
-   flutter build appbundle --release
-
-   Output: build\app\outputs\bundle\release\app-release.aab
-
---- Installing to Android Device ---
-   1. Enable "Developer Options" and "USB Debugging" on device
-   2. Connect device via USB
-   3. Run: flutter install
-   Or manually: adb install build\app\outputs\flutter-apk\app-release.apk
 
 ================================================================================
-                                iOS
+                       iOS - STEP BY STEP SIDELOADING  
 ================================================================================
 
-NOTE: Building for iOS requires macOS with Xcode installed.
+IMPORTANT: iOS sideloading requires a Mac with Xcode. You cannot build iOS
+apps on Windows directly. Choose one of these options:
 
---- Build iOS App ---
-   flutter build ios --release
+--------------------------------------------------------------------------------
+OPTION 1: USING A MAC (FREE - NO DEVELOPER ACCOUNT)
+--------------------------------------------------------------------------------
 
---- For TestFlight/App Store ---
-   1. Open ios/Runner.xcworkspace in Xcode
-   2. Select "Any iOS Device" as build target
-   3. Product > Archive
-   4. Use Organizer to upload to App Store Connect
+Limitations of Free Signing:
+   - App expires after 7 days and must be reinstalled
+   - Limited to 3 apps per Apple ID
+   - Some capabilities restricted (push notifications, etc.)
 
---- Ad-Hoc Distribution ---
-   1. Create an Ad-Hoc provisioning profile in Apple Developer Portal
-   2. Configure signing in Xcode
-   3. Archive and export IPA for Ad-Hoc distribution
+STEP 1: Transfer project to Mac
+   Copy the entire Antenna_Aligner folder to your Mac
 
-================================================================================
-                               WINDOWS
-================================================================================
+STEP 2: Install prerequisites on Mac
+   a) Install Xcode from Mac App Store (free, ~12GB)
+   b) Open Xcode once to accept license and install tools
+   c) Install Flutter for macOS: https://docs.flutter.dev/get-started/install/macos
+   d) Install CocoaPods:
+      sudo gem install cocoapods
 
---- Build Windows Executable ---
-   flutter build windows --release
+STEP 3: Prepare the iOS project
+   Open Terminal and run:
+   
+   cd /path/to/Antenna_Aligner
+   flutter clean
+   flutter pub get
+   cd ios
+   pod install
+   cd ..
 
-   Output: build\windows\x64\runner\Release\
+STEP 4: Open the project in Xcode
+   open ios/Runner.xcworkspace
 
-   The entire Release folder contents are needed for distribution:
-   - sd2_losapp.exe (main executable)
-   - flutter_windows.dll
-   - data\ folder
-   - Other DLL dependencies
+STEP 5: Configure signing (FREE Apple ID)
+   a) In Xcode, select "Runner" in the left sidebar (top item)
+   b) Select "Runner" under TARGETS
+   c) Go to "Signing & Capabilities" tab
+   d) Check "Automatically manage signing"
+   e) Team: Click dropdown > "Add an Account..."
+   f) Sign in with ANY Apple ID (free, no developer program needed)
+   g) Select your "Personal Team"
+   h) If you see errors about bundle ID, change it:
+      Change "com.example.sd2_losapp" to something unique like
+      "com.yourname.antennaaligner"
 
---- Creating an Installer (optional) ---
-   Use tools like:
-   - Inno Setup (free): https://jrsoftware.org/isinfo.php
-   - NSIS: https://nsis.sourceforge.io/
-   - MSIX packaging (Microsoft Store)
+STEP 6: Connect your iPhone/iPad
+   a) Connect via USB cable
+   b) Unlock the device
+   c) Tap "Trust" when prompted on the device
+   d) Enter your device passcode
 
-   For MSIX:
-   flutter pub add msix
-   flutter pub run msix:create
+STEP 7: Select your device in Xcode
+   a) In the top toolbar, click the device dropdown (shows "Any iOS Device")
+   b) Select your connected iPhone/iPad
 
-================================================================================
-                                LINUX
-================================================================================
+STEP 8: Build and install
+   a) Click the Play button (▶) in Xcode OR press Cmd+R
+   b) Wait for build to complete (first build takes 5-10 minutes)
+   c) If you see "Could not launch" - see Step 9
 
---- Build Linux App ---
-   flutter build linux --release
+STEP 9: Trust the developer on your iPhone (REQUIRED for free signing)
+   a) On iPhone: Settings > General > VPN & Device Management
+      (or Settings > General > Profiles & Device Management on older iOS)
+   b) Under "Developer App", tap your Apple ID email
+   c) Tap "Trust [your email]"
+   d) Tap "Trust" to confirm
+   e) Return to Xcode and run again (Cmd+R)
 
-   Output: build/linux/x64/release/bundle/
+STEP 10: Launch the app
+   The app should now launch on your device. Find it in your home screen.
 
---- Distribution Options ---
-   1. Distribute the bundle folder as-is (tar.gz archive)
-   2. Create a Debian package (.deb)
-   3. Create a Snap package
-   4. Create an AppImage
+REMINDER: With free signing, repeat Steps 8-10 every 7 days when app expires.
 
---- Creating a tar.gz Archive ---
-   cd build/linux/x64/release
-   tar -czvf antenna_aligner_linux.tar.gz bundle/
 
-================================================================================
-                                macOS
-================================================================================
+--------------------------------------------------------------------------------
+OPTION 2: USING A MAC (PAID DEVELOPER ACCOUNT - $99/YEAR)
+--------------------------------------------------------------------------------
 
-NOTE: Building for macOS requires macOS with Xcode installed.
+Benefits:
+   - App never expires
+   - Can distribute to others via Ad-Hoc or TestFlight
+   - Full capabilities (push notifications, etc.)
 
---- Build macOS App ---
-   flutter build macos --release
+STEP 1: Enroll in Apple Developer Program
+   https://developer.apple.com/programs/enroll/
+   Cost: $99 USD per year
 
-   Output: build/macos/Build/Products/Release/sd2_losapp.app
+STEP 2: Follow Steps 1-4 from Option 1 above
 
---- Creating a DMG for Distribution ---
-   1. Use create-dmg tool: brew install create-dmg
-   2. create-dmg build/macos/Build/Products/Release/sd2_losapp.app
+STEP 3: Configure signing (Paid Account)
+   a) In Xcode Runner > Signing & Capabilities
+   b) Team: Select your paid developer team
+   c) Signing should complete without errors
 
---- For Mac App Store ---
-   1. Open macos/Runner.xcworkspace in Xcode
-   2. Archive and submit via App Store Connect
+STEP 4: Connect device and build (Steps 6-8 from Option 1)
+   - No need to trust developer profile with paid account
 
-================================================================================
-                                 WEB
-================================================================================
+STEP 5 (OPTIONAL): Create IPA for distribution to others
+   a) In Xcode: Product > Archive
+   b) Wait for archive to complete
+   c) In Organizer window, select the archive
+   d) Click "Distribute App"
+   e) Select "Ad Hoc" (for specific devices) or "Development"
+   f) Follow prompts to export .ipa file
+   g) Share .ipa file with others who have registered devices
 
---- Build Web App ---
-   flutter build web --release
 
-   Output: build/web/
+--------------------------------------------------------------------------------
+OPTION 3: USING WINDOWS (WITH CLOUD MAC SERVICE)
+--------------------------------------------------------------------------------
 
---- Deployment Options ---
-   1. Copy contents of build/web/ to any web server
-   2. Deploy to Firebase Hosting:
-      firebase deploy --only hosting
-   3. Deploy to GitHub Pages, Netlify, Vercel, etc.
+If you don't have a Mac, use a cloud Mac service:
 
---- With Custom Base Path (for subdirectory hosting) ---
-   flutter build web --base-href "/your-path/"
+Services:
+   - MacStadium: https://www.macstadium.com/
+   - MacinCloud: https://www.macincloud.com/ (~$1/hour or $30/month)
+   - AWS EC2 Mac: https://aws.amazon.com/ec2/instance-types/mac/
+   - GitHub Actions (free for public repos): Use macOS runner
 
-================================================================================
-                         DIRECT DEVICE INSTALLATION
-================================================================================
+Using MacinCloud (example):
+   a) Sign up and start a Mac session
+   b) Upload your project folder
+   c) Follow Option 1 or 2 instructions above
 
---- Run Directly on Connected Device ---
-   flutter run -d <device_id>
 
-   Get device list with: flutter devices
+--------------------------------------------------------------------------------
+OPTION 4: USING WINDOWS (THIRD-PARTY TOOLS)
+--------------------------------------------------------------------------------
 
---- Android Wireless Debugging ---
-   1. Enable wireless debugging on device
-   2. adb pair <ip>:<port>
-   3. adb connect <ip>:<port>
-   4. flutter run
+WARNING: These methods have limitations and may not work for all apps.
 
-================================================================================
-                            SIGNING (RELEASE)
-================================================================================
+AltStore (Free, works on Windows):
+   a) Download AltStore: https://altstore.io/
+   b) Install AltServer on Windows
+   c) Connect iPhone and install AltStore via AltServer
+   d) Build IPA on a Mac (or find someone who can)
+   e) Sideload IPA using AltStore
+   
+   Limitations: 7-day expiry, requires refresh via computer
 
---- Android Release Signing ---
-   1. Generate keystore:
-      keytool -genkey -v -keystore upload-keystore.jks -keyalg RSA ^
-              -keysize 2048 -validity 10000 -alias upload
+Sideloadly (Free, works on Windows):
+   a) Download: https://sideloadly.io/
+   b) Requires .ipa file (must build on Mac first)
+   c) Similar 7-day limitations
 
-   2. Create android/key.properties:
-      storePassword=<password>
-      keyPassword=<password>
-      keyAlias=upload
-      storeFile=<path-to-keystore>
-
-   3. Reference in android/app/build.gradle.kts
-
---- iOS/macOS Code Signing ---
-   Requires Apple Developer account and certificates configured in Xcode.
 
 ================================================================================
                               TROUBLESHOOTING
 ================================================================================
 
-- "flutter: command not found"
-  Add Flutter to PATH or use full path to flutter binary
+ANDROID ISSUES:
+---------------
+"Device not found" or "No devices"
+   - Enable USB Debugging (Steps A1-A2)
+   - Try different USB cable (data cable, not charge-only)
+   - Install device USB drivers on Windows
+   - Run: adb kill-server && adb start-server
 
-- Build fails with dependency errors
-  Run: flutter clean && flutter pub get
+"App not installed" error
+   - Uninstall previous version first
+   - Check storage space on device
+   - Enable "Install via USB" in Developer Options
 
-- Android SDK not found
-  Set ANDROID_HOME environment variable
+App crashes on launch
+   - Try debug build: flutter build apk --debug
+   - Check logs: adb logcat | findstr flutter
 
-- iOS build fails
-  Run: cd ios && pod install && cd ..
+iOS ISSUES:
+-----------
+"Unable to install" or signing errors
+   - Change bundle identifier to something unique
+   - Ensure device is unlocked during install
+   - Trust developer profile (Option 1, Step 9)
 
-- Gradle build issues
-  Try: cd android && ./gradlew clean && cd ..
+"Device is busy" error
+   - Disconnect and reconnect device
+   - Restart Xcode
+
+Build fails with CocoaPods error
+   - Run: cd ios && pod install --repo-update && cd ..
+
+App shows "Untrusted Developer"
+   - Follow Step 9 to trust the developer profile
+
+GENERAL ISSUES:
+---------------
+Build fails with dependency errors
+   - Run: flutter clean && flutter pub get
+
+"flutter: command not found"
+   - Add Flutter to PATH
+   - Or use full path: C:\flutter\bin\flutter build apk
+
+================================================================================
+                              QUICK REFERENCE
+================================================================================
+
+ANDROID (on Windows):
+   cd c:\Dev\Antenna_Aligner
+   flutter clean
+   flutter pub get
+   flutter build apk --release
+   flutter install
+
+iOS (on Mac):
+   cd /path/to/Antenna_Aligner
+   flutter clean
+   flutter pub get
+   cd ios && pod install && cd ..
+   open ios/Runner.xcworkspace
+   [Configure signing in Xcode, then Cmd+R to build and run]
 
 ================================================================================
