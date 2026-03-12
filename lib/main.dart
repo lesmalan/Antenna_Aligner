@@ -1,9 +1,22 @@
-
 import 'package:flutter/material.dart';
 import 'dart:async' show TimeoutException;
 import 'dart:math' show sin, max;
 import 'dart:convert';
+import 'dart:io';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:file_picker/file_picker.dart';
+
+/// Data point from sweep containing degree position and amplitude (RSL)
+class SweepDataPoint {
+  final double degree;
+  final double amplitude; // RSL in dBm
+
+  SweepDataPoint({required this.degree, required this.amplitude});
+
+  @override
+  String toString() =>
+      'SweepDataPoint(degree: $degree, amplitude: $amplitude dBm)';
+}
 
 void main() {
   runApp(const MyApp());
@@ -63,38 +76,36 @@ class _AlignmentPageState extends State<AlignmentPage> {
 
   // Azimuth sweep data collection
   AzimuthPhase _azimuthPhase = AzimuthPhase.waitingForConnection;
-  final List<double> _azimuthSweepRSLData =
-      []; // Store all RSL readings during azimuth sweep
+  final List<SweepDataPoint> _azimuthSweepData =
+      []; // Store all degree+RSL readings during azimuth sweep
   double _azimuthMaxSweepRSL = -100.0; // Max RSL found during azimuth sweep
-  int _azimuthTurnbucklesInSweep =
-      0; // User input: how many turnbuckles in azimuth sweep
-  int _azimuthTurnsToMaxRSL =
-      0; // Calculated: how many turns left to reach max RSL
+  double _azimuthMaxSweepDegree = 0.0; // Degree position of max RSL
+  double _azimuthCurrentDegree = 0.0; // Current azimuth degree position
+  double _azimuthDegreesToMaxRSL =
+      0.0; // Calculated: degrees to rotate to reach max RSL
   bool _isRecordingAzimuth = false; // Flag: continuously recording azimuth data
-  bool _azimuthTurnbucklesSubmitted =
-      false; // Flag: user has submitted turnbuckle count
+  bool _azimuthDataLoaded = false; // Flag: CSV data has been loaded
 
   // Elevation sweep data collection
   ElevationPhase _elevationPhase = ElevationPhase.waitingForStart;
-  final List<double> _elevationSweepRSLData =
-      []; // Store all RSL readings during elevation sweep
+  final List<SweepDataPoint> _elevationSweepData =
+      []; // Store all degree+RSL readings during elevation sweep
   double _elevationMaxSweepRSL = -100.0; // Max RSL found during elevation sweep
-  int _elevationTurnbucklesInSweep =
-      0; // User input: how many turnbuckles in elevation sweep
-  int _elevationTurnsFromTopToMax =
-      0; // Calculated: how many turns down from top to reach max RSL
+  double _elevationMaxSweepDegree = 0.0; // Degree position of max RSL
+  double _elevationCurrentDegree = 0.0; // Current elevation degree position
+  double _elevationDegreesToMaxRSL =
+      0.0; // Calculated: degrees to rotate to reach max RSL
   bool _isRecordingElevation =
       false; // Flag: continuously recording elevation data
-  bool _elevationTurnbucklesSubmitted =
-      false; // Flag: user has submitted turnbuckle count
+  bool _elevationDataLoaded = false; // Flag: CSV data has been loaded
 
   // Signal data from Raspberry Pi
   double _currentRSL = -85.5; // dBm
   final double _maxRSL = -75.0; // dBm
-  int _azimuthTurnsLeft = 3;
-  int _azimuthTurnsRight = 0;
-  int _elevationTurnsLeft = 2;
-  int _elevationTurnsRight = 0;
+  double _azimuthDegreesLeft = 0.0; // Degrees to rotate left to reach max
+  double _azimuthDegreesRight = 0.0; // Degrees to rotate right to reach max
+  double _elevationDegreesUp = 0.0; // Degrees to rotate up to reach max
+  double _elevationDegreesDown = 0.0; // Degrees to rotate down to reach max
 
   AlignmentStep _currentStep = AlignmentStep.azimuth;
   bool _azimuthConfirmed = false;
@@ -171,7 +182,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
               // Start sweep automatically on first connection
               if (_azimuthPhase == AzimuthPhase.waitingForConnection) {
                 _azimuthPhase = AzimuthPhase.sweepInProgress;
-                _azimuthSweepRSLData.clear();
+                _azimuthSweepData.clear();
                 _azimuthMaxSweepRSL = -100.0;
               }
 
@@ -180,36 +191,150 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 _currentRSL = (data['rsl'] as num).toDouble();
               }
 
-              // If recording azimuth data during sweep, capture it continuously
+              // Update degree positions if provided
+              if (data.containsKey('azimuth_degree')) {
+                _azimuthCurrentDegree = (data['azimuth_degree'] as num)
+                    .toDouble();
+              }
+              if (data.containsKey('elevation_degree')) {
+                _elevationCurrentDegree = (data['elevation_degree'] as num)
+                    .toDouble();
+              }
+
+              // Handle sweep data from Pi 5 (automatic mode - no CSV upload needed)
+              if (data.containsKey('sweep_active') && data['sweep_active'] == true) {
+                final sweepType = data['sweep_type'] as String?;
+                if (data.containsKey('sweep_point')) {
+                  final point = data['sweep_point'];
+                  final degree = (point['degree'] as num).toDouble();
+                  final amplitude = (point['amplitude'] as num).toDouble();
+                  
+                  if (sweepType == 'azimuth') {
+                    // Auto-start azimuth sweep if not already
+                    if (_azimuthPhase != AzimuthPhase.sweepInProgress) {
+                      _azimuthPhase = AzimuthPhase.sweepInProgress;
+                      _azimuthSweepData.clear();
+                      _azimuthMaxSweepRSL = -100.0;
+                    }
+                    _azimuthSweepData.add(
+                      SweepDataPoint(degree: degree, amplitude: amplitude),
+                    );
+                    if (amplitude > _azimuthMaxSweepRSL) {
+                      _azimuthMaxSweepRSL = amplitude;
+                      _azimuthMaxSweepDegree = degree;
+                    }
+                  } else if (sweepType == 'elevation') {
+                    // Auto-start elevation sweep if not already
+                    if (_elevationPhase != ElevationPhase.sweepInProgress) {
+                      _elevationPhase = ElevationPhase.sweepInProgress;
+                      _elevationSweepData.clear();
+                      _elevationMaxSweepRSL = -100.0;
+                    }
+                    _elevationSweepData.add(
+                      SweepDataPoint(degree: degree, amplitude: amplitude),
+                    );
+                    if (amplitude > _elevationMaxSweepRSL) {
+                      _elevationMaxSweepRSL = amplitude;
+                      _elevationMaxSweepDegree = degree;
+                    }
+                  }
+                }
+              }
+
+              // Handle sweep completion from Pi 5
+              if (data.containsKey('sweep_status') && data['sweep_status'] == 'completed') {
+                final sweepType = data['sweep_type'] as String?;
+                // Process bulk sweep data if provided
+                if (data.containsKey('sweep_data')) {
+                  final sweepDataList = data['sweep_data'] as List;
+                  if (sweepType == 'azimuth') {
+                    _azimuthSweepData.clear();
+                    _azimuthMaxSweepRSL = -100.0;
+                    for (final point in sweepDataList) {
+                      final degree = (point['degree'] as num).toDouble();
+                      final amplitude = (point['amplitude'] as num).toDouble();
+                      _azimuthSweepData.add(
+                        SweepDataPoint(degree: degree, amplitude: amplitude),
+                      );
+                      if (amplitude > _azimuthMaxSweepRSL) {
+                        _azimuthMaxSweepRSL = amplitude;
+                        _azimuthMaxSweepDegree = degree;
+                      }
+                    }
+                  } else if (sweepType == 'elevation') {
+                    _elevationSweepData.clear();
+                    _elevationMaxSweepRSL = -100.0;
+                    for (final point in sweepDataList) {
+                      final degree = (point['degree'] as num).toDouble();
+                      final amplitude = (point['amplitude'] as num).toDouble();
+                      _elevationSweepData.add(
+                        SweepDataPoint(degree: degree, amplitude: amplitude),
+                      );
+                      if (amplitude > _elevationMaxSweepRSL) {
+                        _elevationMaxSweepRSL = amplitude;
+                        _elevationMaxSweepDegree = degree;
+                      }
+                    }
+                  }
+                }
+                // Mark sweep as complete
+                if (sweepType == 'azimuth' && _azimuthSweepData.isNotEmpty) {
+                  _azimuthPhase = AzimuthPhase.sweepComplete;
+                  _azimuthDataLoaded = true;
+                  _calculateAzimuthDegreesToMax();
+                } else if (sweepType == 'elevation' && _elevationSweepData.isNotEmpty) {
+                  _elevationPhase = ElevationPhase.sweepComplete;
+                  _elevationDataLoaded = true;
+                  _calculateElevationDegreesToMax();
+                }
+              }
+
+              // Legacy: manual recording mode (fallback if no auto sweep data)
               if (_isRecordingAzimuth &&
                   _azimuthPhase == AzimuthPhase.sweepInProgress) {
-                _azimuthSweepRSLData.add(_currentRSL);
+                _azimuthSweepData.add(
+                  SweepDataPoint(
+                    degree: _azimuthCurrentDegree,
+                    amplitude: _currentRSL,
+                  ),
+                );
                 if (_currentRSL > _azimuthMaxSweepRSL) {
                   _azimuthMaxSweepRSL = _currentRSL;
+                  _azimuthMaxSweepDegree = _azimuthCurrentDegree;
                 }
               }
 
-              // If recording elevation data during sweep, capture it continuously
+              // Legacy: manual recording mode (fallback if no auto sweep data)
               if (_isRecordingElevation &&
                   _elevationPhase == ElevationPhase.sweepInProgress) {
-                _elevationSweepRSLData.add(_currentRSL);
+                _elevationSweepData.add(
+                  SweepDataPoint(
+                    degree: _elevationCurrentDegree,
+                    amplitude: _currentRSL,
+                  ),
+                );
                 if (_currentRSL > _elevationMaxSweepRSL) {
                   _elevationMaxSweepRSL = _currentRSL;
+                  _elevationMaxSweepDegree = _elevationCurrentDegree;
                 }
               }
 
-              // Optionally update turns if provided by server
-              if (data.containsKey('azimuth_turns_left')) {
-                _azimuthTurnsLeft = data['azimuth_turns_left'] as int;
+              // Update degree rotation hints if provided by server
+              if (data.containsKey('azimuth_degrees_left')) {
+                _azimuthDegreesLeft = (data['azimuth_degrees_left'] as num)
+                    .toDouble();
               }
-              if (data.containsKey('azimuth_turns_right')) {
-                _azimuthTurnsRight = data['azimuth_turns_right'] as int;
+              if (data.containsKey('azimuth_degrees_right')) {
+                _azimuthDegreesRight = (data['azimuth_degrees_right'] as num)
+                    .toDouble();
               }
-              if (data.containsKey('elevation_turns_left')) {
-                _elevationTurnsLeft = data['elevation_turns_left'] as int;
+              if (data.containsKey('elevation_degrees_up')) {
+                _elevationDegreesUp = (data['elevation_degrees_up'] as num)
+                    .toDouble();
               }
-              if (data.containsKey('elevation_turns_right')) {
-                _elevationTurnsRight = data['elevation_turns_right'] as int;
+              if (data.containsKey('elevation_degrees_down')) {
+                _elevationDegreesDown = (data['elevation_degrees_down'] as num)
+                    .toDouble();
               }
             });
           } catch (e) {
@@ -256,6 +381,204 @@ class _AlignmentPageState extends State<AlignmentPage> {
   void dispose() {
     _channel?.sink.close();
     super.dispose();
+  }
+
+  /// Load azimuth sweep data from CSV file
+  Future<void> _loadAzimuthCSV() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+        dialogTitle: 'Select Azimuth Sweep CSV File',
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+        await _parseCSVFile(file, isAzimuth: true);
+      }
+    } catch (e) {
+      debugPrint('Error loading azimuth CSV: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading CSV: $e')));
+      }
+    }
+  }
+
+  /// Load elevation sweep data from CSV file
+  Future<void> _loadElevationCSV() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['csv'],
+        dialogTitle: 'Select Elevation Sweep CSV File',
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+        await _parseCSVFile(file, isAzimuth: false);
+      }
+    } catch (e) {
+      debugPrint('Error loading elevation CSV: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error loading CSV: $e')));
+      }
+    }
+  }
+
+  /// Parse CSV file and extract degree + amplitude data
+  /// Expected columns: azimuth_steps or elevation_steps, amplitude_dB or Amplitude_Smoothed_dB
+  Future<void> _parseCSVFile(File file, {required bool isAzimuth}) async {
+    try {
+      final lines = await file.readAsLines();
+      if (lines.isEmpty) {
+        throw Exception('CSV file is empty');
+      }
+
+      // Parse header to find column indices
+      final header = lines[0].toLowerCase().split(',');
+      int degreeColIndex = -1;
+      int amplitudeColIndex = -1;
+
+      for (int i = 0; i < header.length; i++) {
+        final col = header[i].trim();
+        // Look for degree columns
+        if (col.contains('azimuth') ||
+            col.contains('elevation') ||
+            col.contains('degree') ||
+            col.contains('steps')) {
+          if (isAzimuth && (col.contains('azimuth') || degreeColIndex == -1)) {
+            degreeColIndex = i;
+          } else if (!isAzimuth &&
+              (col.contains('elevation') || degreeColIndex == -1)) {
+            degreeColIndex = i;
+          }
+        }
+        // Look for amplitude columns - prefer smoothed
+        if (col.contains('smoothed') || col.contains('amplitude')) {
+          if (col.contains('smoothed') || amplitudeColIndex == -1) {
+            amplitudeColIndex = i;
+          }
+        }
+      }
+
+      if (degreeColIndex == -1 || amplitudeColIndex == -1) {
+        throw Exception(
+          'Could not find required columns (degree and amplitude) in CSV',
+        );
+      }
+
+      final dataPoints = <SweepDataPoint>[];
+      double maxAmplitude = -100.0;
+      double maxDegree = 0.0;
+
+      // Parse data rows
+      for (int i = 1; i < lines.length; i++) {
+        final parts = lines[i].split(',');
+        if (parts.length > max(degreeColIndex, amplitudeColIndex)) {
+          final degree = double.tryParse(parts[degreeColIndex].trim());
+          final amplitude = double.tryParse(parts[amplitudeColIndex].trim());
+
+          if (degree != null && amplitude != null) {
+            dataPoints.add(
+              SweepDataPoint(degree: degree, amplitude: amplitude),
+            );
+            if (amplitude > maxAmplitude) {
+              maxAmplitude = amplitude;
+              maxDegree = degree;
+            }
+          }
+        }
+      }
+
+      if (dataPoints.isEmpty) {
+        throw Exception('No valid data points found in CSV');
+      }
+
+      setState(() {
+        if (isAzimuth) {
+          _azimuthSweepData.clear();
+          _azimuthSweepData.addAll(dataPoints);
+          _azimuthMaxSweepRSL = maxAmplitude;
+          _azimuthMaxSweepDegree = maxDegree;
+          _azimuthDataLoaded = true;
+          _azimuthPhase = AzimuthPhase.sweepComplete;
+          _calculateAzimuthDegreesToMax();
+        } else {
+          _elevationSweepData.clear();
+          _elevationSweepData.addAll(dataPoints);
+          _elevationMaxSweepRSL = maxAmplitude;
+          _elevationMaxSweepDegree = maxDegree;
+          _elevationDataLoaded = true;
+          _elevationPhase = ElevationPhase.sweepComplete;
+          _calculateElevationDegreesToMax();
+        }
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Loaded ${dataPoints.length} data points. Max RSL: ${maxAmplitude.toStringAsFixed(1)} dBm at ${maxDegree.toStringAsFixed(1)}°',
+            ),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error parsing CSV: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error parsing CSV: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Calculate degrees to rotate to reach max RSL for azimuth
+  void _calculateAzimuthDegreesToMax() {
+    if (_azimuthSweepData.isEmpty) return;
+
+    // Get current position (last data point if from live recording, or use 0 as starting point)
+    final currentDegree = _azimuthCurrentDegree;
+    final targetDegree = _azimuthMaxSweepDegree;
+
+    _azimuthDegreesToMaxRSL = targetDegree - currentDegree;
+
+    // Update directional hints
+    if (_azimuthDegreesToMaxRSL > 0) {
+      _azimuthDegreesRight = _azimuthDegreesToMaxRSL;
+      _azimuthDegreesLeft = 0;
+    } else {
+      _azimuthDegreesLeft = _azimuthDegreesToMaxRSL.abs();
+      _azimuthDegreesRight = 0;
+    }
+  }
+
+  /// Calculate degrees to rotate to reach max RSL for elevation
+  void _calculateElevationDegreesToMax() {
+    if (_elevationSweepData.isEmpty) return;
+
+    // Get current position (last data point if from live recording, or use 0 as starting point)
+    final currentDegree = _elevationCurrentDegree;
+    final targetDegree = _elevationMaxSweepDegree;
+
+    _elevationDegreesToMaxRSL = targetDegree - currentDegree;
+
+    // Update directional hints
+    if (_elevationDegreesToMaxRSL > 0) {
+      _elevationDegreesUp = _elevationDegreesToMaxRSL;
+      _elevationDegreesDown = 0;
+    } else {
+      _elevationDegreesDown = _elevationDegreesToMaxRSL.abs();
+      _elevationDegreesUp = 0;
+    }
   }
 
   void _setOverrideView(OverrideView view) {
@@ -305,23 +628,47 @@ class _AlignmentPageState extends State<AlignmentPage> {
   }
 
   void _seedAzimuthDemoData() {
-    _azimuthSweepRSLData
+    _azimuthSweepData
       ..clear()
-      ..addAll(const [-95.0, -92.0, -90.5, -88.0, -86.0, -84.0, -83.0, -84.5]);
-    _azimuthMaxSweepRSL = _azimuthSweepRSLData.reduce(max);
-    _azimuthTurnbucklesInSweep = 8;
-    _azimuthTurnsToMaxRSL = 6;
-    _azimuthTurnbucklesSubmitted = true;
+      ..addAll([
+        SweepDataPoint(degree: -40, amplitude: -95.0),
+        SweepDataPoint(degree: -30, amplitude: -92.0),
+        SweepDataPoint(degree: -20, amplitude: -90.5),
+        SweepDataPoint(degree: -10, amplitude: -88.0),
+        SweepDataPoint(degree: 0, amplitude: -86.0),
+        SweepDataPoint(degree: 10, amplitude: -84.0),
+        SweepDataPoint(degree: 20, amplitude: -83.0), // Max RSL at 20°
+        SweepDataPoint(degree: 30, amplitude: -84.5),
+      ]);
+    _azimuthMaxSweepRSL = -83.0;
+    _azimuthMaxSweepDegree = 20.0;
+    _azimuthCurrentDegree = 30.0; // Currently at end of sweep
+    _azimuthDegreesToMaxRSL = -10.0; // Need to go back 10° left
+    _azimuthDegreesLeft = 10.0;
+    _azimuthDegreesRight = 0.0;
+    _azimuthDataLoaded = true;
   }
 
   void _seedElevationDemoData() {
-    _elevationSweepRSLData
+    _elevationSweepData
       ..clear()
-      ..addAll(const [-96.0, -94.0, -91.0, -89.5, -87.0, -85.0, -84.0, -83.5]);
-    _elevationMaxSweepRSL = _elevationSweepRSLData.reduce(max);
-    _elevationTurnbucklesInSweep = 6;
-    _elevationTurnsFromTopToMax = 2;
-    _elevationTurnbucklesSubmitted = true;
+      ..addAll([
+        SweepDataPoint(degree: -20, amplitude: -96.0),
+        SweepDataPoint(degree: -15, amplitude: -94.0),
+        SweepDataPoint(degree: -10, amplitude: -91.0),
+        SweepDataPoint(degree: -5, amplitude: -89.5),
+        SweepDataPoint(degree: 0, amplitude: -87.0),
+        SweepDataPoint(degree: 5, amplitude: -85.0),
+        SweepDataPoint(degree: 10, amplitude: -83.5), // Max RSL at 10°
+        SweepDataPoint(degree: 15, amplitude: -84.0),
+      ]);
+    _elevationMaxSweepRSL = -83.5;
+    _elevationMaxSweepDegree = 10.0;
+    _elevationCurrentDegree = 15.0; // Currently at end of sweep
+    _elevationDegreesToMaxRSL = -5.0; // Need to go down 5°
+    _elevationDegreesDown = 5.0;
+    _elevationDegreesUp = 0.0;
+    _elevationDataLoaded = true;
   }
 
   void _disableOverride() {
@@ -829,7 +1176,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${_azimuthSweepRSLData.length}',
+                                    '${_azimuthSweepData.length}',
                                     style: Theme.of(context)
                                         .textTheme
                                         .titleLarge
@@ -938,7 +1285,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
       );
     }
 
-    // Sweep complete - ask for number of turnbuckles
+    // Sweep complete - show degree analysis and load CSV option
     if (_azimuthPhase == AzimuthPhase.sweepComplete) {
       return Scaffold(
         appBar: AppBar(
@@ -977,7 +1324,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  'Sweep Complete',
+                                  _azimuthDataLoaded
+                                      ? 'CSV Data Loaded'
+                                      : 'Sweep Complete',
                                   style: Theme.of(context).textTheme.titleMedium
                                       ?.copyWith(
                                         fontWeight: FontWeight.bold,
@@ -994,12 +1343,12 @@ class _AlignmentPageState extends State<AlignmentPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Data points collected: ${_azimuthSweepRSLData.length}',
+                              'Data points collected: ${_azimuthSweepData.length}',
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Maximum RSL found: ${_azimuthMaxSweepRSL.toStringAsFixed(1)} dBm',
+                              'Maximum RSL: ${_azimuthMaxSweepRSL.toStringAsFixed(1)} dBm at ${_azimuthMaxSweepDegree.toStringAsFixed(1)}°',
                               style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(
                                     color: Colors.green[700],
@@ -1009,60 +1358,55 @@ class _AlignmentPageState extends State<AlignmentPage> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 32),
-                      // Input section
-                      Text(
-                        'How many turnbuckles were in your sweep?',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        keyboardType: TextInputType.number,
-                        onChanged: (value) {
-                          setState(() {
-                            final parsed = int.tryParse(value) ?? 0;
-                            _azimuthTurnbucklesInSweep = parsed > 0
-                                ? parsed
-                                : 0;
-                          });
-                        },
-                        decoration: InputDecoration(
-                          hintText: 'Enter number of turnbuckles (minimum 1)',
-                          errorText: _azimuthTurnbucklesInSweep == 0
-                              ? null
-                              : null,
-                          border: OutlineInputBorder(
+                      const SizedBox(height: 24),
+                      // Data status and optional CSV fallback
+                      if (!_azimuthDataLoaded) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.blue[50],
+                            border: Border.all(color: Colors.blue[300]!),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          prefixIcon: const Icon(Icons.settings),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
+                          child: Row(
+                            children: [
+                              Icon(Icons.wifi, color: Colors.blue[700]),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Sweep data will be received automatically from Pi 5 when you run the motor control script.',
+                                  style: TextStyle(color: Colors.blue[800]),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      if (_azimuthTurnbucklesInSweep > 0 &&
-                          !_azimuthTurnbucklesSubmitted) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          'Or load from CSV file (optional):',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: Colors.grey[600]),
+                        ),
+                        const SizedBox(height: 8),
                         SizedBox(
                           width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: _submitAzimuthTurnbuckles,
-                            icon: const Icon(Icons.check),
-                            label: const Text('Submit'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.amber[800],
-                              foregroundColor: Colors.white,
+                          child: OutlinedButton.icon(
+                            onPressed: _loadAzimuthCSV,
+                            icon: const Icon(Icons.upload_file),
+                            label: const Text('Load Azimuth CSV'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.grey[700],
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 32,
-                                vertical: 16,
+                                vertical: 12,
                               ),
                             ),
                           ),
                         ),
+                        const SizedBox(height: 24),
                       ],
-                      if (_azimuthTurnbucklesSubmitted) ...[
+                      // Show alignment instructions when data is loaded
+                      if (_azimuthDataLoaded) ...[
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
@@ -1080,17 +1424,17 @@ class _AlignmentPageState extends State<AlignmentPage> {
                               ),
                               const SizedBox(height: 12),
                               Text(
-                                'You rotated through $_azimuthTurnbucklesInSweep turnbuckles',
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Maximum signal was at: ${_azimuthMaxSweepRSL.toStringAsFixed(1)} dBm',
+                                'Maximum signal at: ${_azimuthMaxSweepDegree.toStringAsFixed(1)}°',
                                 style: Theme.of(context).textTheme.bodyMedium
                                     ?.copyWith(
                                       color: Colors.green[700],
                                       fontWeight: FontWeight.bold,
                                     ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Current position: ${_azimuthCurrentDegree.toStringAsFixed(1)}°',
+                                style: Theme.of(context).textTheme.bodyMedium,
                               ),
                               const SizedBox(height: 12),
                               Container(
@@ -1108,16 +1452,18 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                       context,
                                     ).textTheme.bodyMedium,
                                     children: [
-                                      const TextSpan(
-                                        text:
-                                            'You are currently at the RIGHT end of your sweep. You need to turn LEFT ',
+                                      TextSpan(
+                                        text: _azimuthDegreesToMaxRSL < 0
+                                            ? 'Rotate LEFT '
+                                            : 'Rotate RIGHT ',
                                       ),
                                       TextSpan(
                                         text:
-                                            '$_azimuthTurnsToMaxRSL turnbuckles',
+                                            '${_azimuthDegreesToMaxRSL.abs().toStringAsFixed(1)}°',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: Colors.orange,
+                                          fontSize: 18,
                                         ),
                                       ),
                                       const TextSpan(
@@ -1261,7 +1607,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    '${_elevationSweepRSLData.length}',
+                                    '${_elevationSweepData.length}',
                                     style: Theme.of(context)
                                         .textTheme
                                         .titleLarge
@@ -1409,7 +1755,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  'Sweep Complete',
+                                  _elevationDataLoaded
+                                      ? 'CSV Data Loaded'
+                                      : 'Sweep Complete',
                                   style: Theme.of(context).textTheme.titleMedium
                                       ?.copyWith(
                                         fontWeight: FontWeight.bold,
@@ -1426,12 +1774,12 @@ class _AlignmentPageState extends State<AlignmentPage> {
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Data points collected: ${_elevationSweepRSLData.length}',
+                              'Data points collected: ${_elevationSweepData.length}',
                               style: Theme.of(context).textTheme.bodyMedium,
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              'Maximum RSL found: ${_elevationMaxSweepRSL.toStringAsFixed(1)} dBm',
+                              'Maximum RSL: ${_elevationMaxSweepRSL.toStringAsFixed(1)} dBm at ${_elevationMaxSweepDegree.toStringAsFixed(1)}°',
                               style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(
                                     color: Colors.green[700],
@@ -1441,60 +1789,55 @@ class _AlignmentPageState extends State<AlignmentPage> {
                           ],
                         ),
                       ),
-                      const SizedBox(height: 32),
-                      // Input section
-                      Text(
-                        'How many turnbuckles were in your sweep?',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        keyboardType: TextInputType.number,
-                        onChanged: (value) {
-                          setState(() {
-                            final parsed = int.tryParse(value) ?? 0;
-                            _elevationTurnbucklesInSweep = parsed > 0
-                                ? parsed
-                                : 0;
-                          });
-                        },
-                        decoration: InputDecoration(
-                          hintText: 'Enter number of turnbuckles (minimum 1)',
-                          errorText: _elevationTurnbucklesInSweep == 0
-                              ? null
-                              : null,
-                          border: OutlineInputBorder(
+                      const SizedBox(height: 24),
+                      // Data status and optional CSV fallback
+                      if (!_elevationDataLoaded) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.blue[50],
+                            border: Border.all(color: Colors.blue[300]!),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          prefixIcon: const Icon(Icons.settings),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
+                          child: Row(
+                            children: [
+                              Icon(Icons.wifi, color: Colors.blue[700]),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Sweep data will be received automatically from Pi 5 when you run the motor control script.',
+                                  style: TextStyle(color: Colors.blue[800]),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      if (_elevationTurnbucklesInSweep > 0 &&
-                          !_elevationTurnbucklesSubmitted) ...[
+                        const SizedBox(height: 16),
+                        Text(
+                          'Or load from CSV file (optional):',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: Colors.grey[600]),
+                        ),
+                        const SizedBox(height: 8),
                         SizedBox(
                           width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: _submitElevationTurnbuckles,
-                            icon: const Icon(Icons.check),
-                            label: const Text('Submit'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.amber[800],
-                              foregroundColor: Colors.white,
+                          child: OutlinedButton.icon(
+                            onPressed: _loadElevationCSV,
+                            icon: const Icon(Icons.upload_file),
+                            label: const Text('Load Elevation CSV'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.grey[700],
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 32,
-                                vertical: 16,
+                                vertical: 12,
                               ),
                             ),
                           ),
                         ),
+                        const SizedBox(height: 24),
                       ],
-                      if (_elevationTurnbucklesSubmitted) ...[
+                      // Show alignment instructions when data is loaded
+                      if (_elevationDataLoaded) ...[
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
@@ -1512,17 +1855,17 @@ class _AlignmentPageState extends State<AlignmentPage> {
                               ),
                               const SizedBox(height: 12),
                               Text(
-                                'You rotated through $_elevationTurnbucklesInSweep turnbuckles',
-                                style: Theme.of(context).textTheme.bodyMedium,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Maximum signal was at: ${_elevationMaxSweepRSL.toStringAsFixed(1)} dBm',
+                                'Maximum signal at: ${_elevationMaxSweepDegree.toStringAsFixed(1)}°',
                                 style: Theme.of(context).textTheme.bodyMedium
                                     ?.copyWith(
                                       color: Colors.green[700],
                                       fontWeight: FontWeight.bold,
                                     ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Current position: ${_elevationCurrentDegree.toStringAsFixed(1)}°',
+                                style: Theme.of(context).textTheme.bodyMedium,
                               ),
                               const SizedBox(height: 12),
                               Container(
@@ -1540,16 +1883,18 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                       context,
                                     ).textTheme.bodyMedium,
                                     children: [
-                                      const TextSpan(
-                                        text:
-                                            'You are currently at the TOP of your sweep. You need to go DOWN ',
+                                      TextSpan(
+                                        text: _elevationDegreesToMaxRSL < 0
+                                            ? 'Rotate DOWN '
+                                            : 'Rotate UP ',
                                       ),
                                       TextSpan(
                                         text:
-                                            '$_elevationTurnsFromTopToMax turnbuckles',
+                                            '${_elevationDegreesToMaxRSL.abs().toStringAsFixed(1)}°',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
                                           color: Colors.orange,
+                                          fontSize: 18,
                                         ),
                                       ),
                                       const TextSpan(
@@ -1718,16 +2063,16 @@ class _AlignmentPageState extends State<AlignmentPage> {
             if (_currentStep == AlignmentStep.azimuth)
               _buildAlignmentCard(
                 title: 'Azimuth',
-                turnsLeft: _azimuthTurnsLeft,
-                turnsRight: _azimuthTurnsRight,
+                degreesLeft: _azimuthDegreesLeft,
+                degreesRight: _azimuthDegreesRight,
                 isActive: true,
                 isConfirmed: _azimuthConfirmed,
               ),
             if (_currentStep == AlignmentStep.elevation)
               _buildAlignmentCard(
                 title: 'Elevation',
-                turnsLeft: _elevationTurnsLeft,
-                turnsRight: _elevationTurnsRight,
+                degreesLeft: _elevationDegreesDown,
+                degreesRight: _elevationDegreesUp,
                 isActive: true,
                 isConfirmed: _elevationConfirmed,
               ),
@@ -1739,8 +2084,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
 
   Widget _buildAlignmentCard({
     required String title,
-    required int turnsLeft,
-    required int turnsRight,
+    required double degreesLeft,
+    required double degreesRight,
     required bool isActive,
     required bool isConfirmed,
   }) {
@@ -1776,17 +2121,18 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 text: TextSpan(
                   style: Theme.of(context).textTheme.bodySmall,
                   children: [
-                    if (turnsLeft > 0)
+                    if (degreesLeft > 0)
                       TextSpan(
-                        text: 'Turn LEFT $turnsLeft',
+                        text: 'Rotate LEFT ${degreesLeft.toStringAsFixed(1)}°',
                         style: const TextStyle(
                           color: Colors.orange,
                           fontWeight: FontWeight.bold,
                         ),
                       )
-                    else if (turnsRight > 0)
+                    else if (degreesRight > 0)
                       TextSpan(
-                        text: 'Turn RIGHT $turnsRight',
+                        text:
+                            'Rotate RIGHT ${degreesRight.toStringAsFixed(1)}°',
                         style: const TextStyle(
                           color: Colors.orange,
                           fontWeight: FontWeight.bold,
@@ -1848,9 +2194,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
   void _startElevationSweep() {
     setState(() {
       _elevationPhase = ElevationPhase.sweepInProgress;
-      _elevationSweepRSLData.clear();
+      _elevationSweepData.clear();
       _elevationMaxSweepRSL = -100.0;
-      _elevationTurnbucklesSubmitted = false;
+      _elevationDataLoaded = false;
       // Seed demo data when in debug mode
       if (_overrideMode) {
         _seedElevationDemoData();
@@ -1896,60 +2242,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
     );
   }
 
-  void _submitAzimuthTurnbuckles() {
-    if (_azimuthTurnbucklesInSweep > 0 && _azimuthSweepRSLData.isNotEmpty) {
-      // Find the index of max RSL in the sweep data
-      int maxIndex = _azimuthSweepRSLData.indexOf(_azimuthMaxSweepRSL);
-
-      // Calculate how many turnbuckles from the start (left) to the max
-      if (maxIndex >= 0) {
-        _azimuthTurnsToMaxRSL =
-            (maxIndex /
-                    _azimuthSweepRSLData.length *
-                    _azimuthTurnbucklesInSweep)
-                .round();
-      }
-
-      setState(() {
-        _azimuthTurnbucklesSubmitted = true;
-      });
-    }
-  }
-
-  void _submitElevationTurnbuckles() {
-    if (_elevationTurnbucklesInSweep > 0 && _elevationSweepRSLData.isNotEmpty) {
-      // Find the index of max RSL in the sweep data
-      int maxIndex = _elevationSweepRSLData.indexOf(_elevationMaxSweepRSL);
-
-      // Calculate how many turnbuckles down from the top to the max
-      if (maxIndex >= 0) {
-        _elevationTurnsFromTopToMax =
-            (_elevationSweepRSLData.length - maxIndex - 1);
-      }
-
-      setState(() {
-        _elevationTurnbucklesSubmitted = true;
-      });
-    }
-  }
-
   void _confirmAzimuthAlignment() {
-    // Calculate how many turns from right to max
-    if (_azimuthTurnbucklesInSweep > 0 && _azimuthSweepRSLData.isNotEmpty) {
-      // Find the index of max RSL in the sweep data
-      int maxIndex = _azimuthSweepRSLData.indexOf(_azimuthMaxSweepRSL);
-
-      // Calculate how many turnbuckles from the start (left) to the max
-      // The technician starts from the left and sweeps right
-      // So turnbuckles from left = max index position relative to total sweep
-      if (maxIndex >= 0) {
-        _azimuthTurnsToMaxRSL =
-            (maxIndex /
-                    _azimuthSweepRSLData.length *
-                    _azimuthTurnbucklesInSweep)
-                .round();
-      }
-
+    // Data should already be loaded from CSV
+    if (_azimuthSweepData.isNotEmpty) {
       setState(() {
         _azimuthPhase = AzimuthPhase.aligned;
         _azimuthConfirmed = true;
@@ -1963,7 +2258,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _showConfirmationDialog(
         title: 'Azimuth Aligned',
         message:
-            'Azimuth alignment complete. You are now at $_azimuthTurnsToMaxRSL turnbuckles from the starting position.\n\nProceeding to elevation alignment...',
+            'Azimuth alignment complete. Target position: ${_azimuthMaxSweepDegree.toStringAsFixed(1)}°\n\nProceeding to elevation alignment...',
         onConfirm: () {
           Navigator.pop(context);
           // Start elevation sweep after azimuth is confirmed
@@ -1980,19 +2275,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
   }
 
   void _confirmElevationAlignment() {
-    // Calculate how many turns from top to max
-    if (_elevationTurnbucklesInSweep > 0 && _elevationSweepRSLData.isNotEmpty) {
-      // Find the index of max RSL in the sweep data
-      int maxIndex = _elevationSweepRSLData.indexOf(_elevationMaxSweepRSL);
-
-      // Calculate how many turnbuckles down from the top to the max
-      // The technician starts at the bottom and sweeps to the top
-      // So turns down from top = (total - max index position)
-      if (maxIndex >= 0) {
-        _elevationTurnsFromTopToMax =
-            (_elevationSweepRSLData.length - maxIndex - 1);
-      }
-
+    // Data should already be loaded from CSV
+    if (_elevationSweepData.isNotEmpty) {
       if (_currentSide == 1) {
         // Side 1 complete - proceed to side 2
         setState(() {
@@ -2009,7 +2293,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           title: 'Side 1 Alignment Complete',
           message:
               'Side 1 azimuth and elevation alignment is complete.\n\n'
-              'From the TOP, go DOWN $_elevationTurnsFromTopToMax turnbuckles to reach maximum signal.',
+              'Target elevation: ${_elevationMaxSweepDegree.toStringAsFixed(1)}° (rotate ${_elevationDegreesToMaxRSL.abs().toStringAsFixed(1)}° ${_elevationDegreesToMaxRSL < 0 ? "DOWN" : "UP"}).',
           disconnectMessage: 'Please DISCONNECT from Side 1 antenna now.',
           nextAction:
               'Connect to Side 2 antenna and tap "Continue" to proceed.',
@@ -2040,7 +2324,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           title: 'Alignment Finalized',
           message:
               'Side 2 azimuth and elevation alignment is complete.\n\n'
-              'From the TOP, go DOWN $_elevationTurnsFromTopToMax turnbuckles to reach maximum signal.',
+              'Target elevation: ${_elevationMaxSweepDegree.toStringAsFixed(1)}° (rotate ${_elevationDegreesToMaxRSL.abs().toStringAsFixed(1)}° ${_elevationDegreesToMaxRSL < 0 ? "DOWN" : "UP"}).',
           disconnectMessage: 'Please DISCONNECT from Side 2 antenna now.',
           nextAction: 'Both antennas are now fully aligned!',
           showStartNewAlignment: false,
@@ -2057,22 +2341,22 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _currentSide = 2;
       // Reset azimuth state for side 2
       _azimuthPhase = AzimuthPhase.sweepInProgress;
-      _azimuthSweepRSLData.clear();
+      _azimuthSweepData.clear();
       _azimuthMaxSweepRSL = -100.0;
-      _azimuthTurnbucklesInSweep = 0;
-      _azimuthTurnsToMaxRSL = 0;
+      _azimuthMaxSweepDegree = 0.0;
+      _azimuthDegreesToMaxRSL = 0.0;
       _azimuthConfirmed = false;
       _isRecordingAzimuth = false;
-      _azimuthTurnbucklesSubmitted = false;
+      _azimuthDataLoaded = false;
       // Reset elevation state for side 2
       _elevationPhase = ElevationPhase.waitingForStart;
-      _elevationSweepRSLData.clear();
+      _elevationSweepData.clear();
       _elevationMaxSweepRSL = -100.0;
-      _elevationTurnbucklesInSweep = 0;
-      _elevationTurnsFromTopToMax = 0;
+      _elevationMaxSweepDegree = 0.0;
+      _elevationDegreesToMaxRSL = 0.0;
       _elevationConfirmed = false;
       _isRecordingElevation = false;
-      _elevationTurnbucklesSubmitted = false;
+      _elevationDataLoaded = false;
       // Reset step
       _currentStep = AlignmentStep.azimuth;
       // Seed demo data when in debug mode
@@ -2219,23 +2503,23 @@ class _AlignmentPageState extends State<AlignmentPage> {
 
       // Reset azimuth state
       _azimuthPhase = AzimuthPhase.sweepInProgress;
-      _azimuthSweepRSLData.clear();
+      _azimuthSweepData.clear();
       _azimuthMaxSweepRSL = -100.0;
-      _azimuthTurnbucklesInSweep = 0;
-      _azimuthTurnsToMaxRSL = 0;
+      _azimuthMaxSweepDegree = 0.0;
+      _azimuthDegreesToMaxRSL = 0.0;
       _azimuthConfirmed = false;
       _isRecordingAzimuth = false;
-      _azimuthTurnbucklesSubmitted = false;
+      _azimuthDataLoaded = false;
 
       // Reset elevation state
       _elevationPhase = ElevationPhase.waitingForStart;
-      _elevationSweepRSLData.clear();
+      _elevationSweepData.clear();
       _elevationMaxSweepRSL = -100.0;
-      _elevationTurnbucklesInSweep = 0;
-      _elevationTurnsFromTopToMax = 0;
+      _elevationMaxSweepDegree = 0.0;
+      _elevationDegreesToMaxRSL = 0.0;
       _elevationConfirmed = false;
       _isRecordingElevation = false;
-      _elevationTurnbucklesSubmitted = false;
+      _elevationDataLoaded = false;
 
       // Reset override mode
       if (_overrideMode) {
@@ -2451,5 +2735,3 @@ class SineWavePainter extends CustomPainter {
     return oldDelegate.currentRSL != currentRSL || oldDelegate.maxRSL != maxRSL;
   }
 }
-
-

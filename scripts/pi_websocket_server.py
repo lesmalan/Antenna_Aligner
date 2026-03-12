@@ -4,15 +4,20 @@ WebSocket server for Flutter app.
 
 Listens on 0.0.0.0:8000 and provides:
 - Real-time RSL (signal strength) data streaming from VNA
+- Sweep data (azimuth/elevation) with degree + amplitude
+- Motor position tracking
 - Command handling from Flutter client
 
-Requires: pip install websockets pyvisa pyvisa-py
+The Flutter app connects and automatically receives sweep data when the
+real-time monitor motor controls script is running.
+
+Requires: pip install websockets pyvisa pyvisa-py pyserial
 """
 import asyncio
 import json
 import random
 import time
-from typing import Optional, Set
+from typing import Optional, Set, Dict, List
 
 try:
     import websockets
@@ -29,6 +34,13 @@ except ImportError:
     print("Install with: pip install pyvisa pyvisa-py")
     visa = None
 
+try:
+    import serial
+except ImportError:
+    print("Warning: pyserial not installed. Motor control disabled.")
+    print("Install with: pip install pyserial")
+    serial = None
+
 # Connected WebSocket clients
 WS_CLIENTS: Set = set()
 
@@ -39,9 +51,22 @@ VNA_FREQ = 1e9  # 1 GHz
 VNA_PARAM = "S21"  # S-parameter to measure
 vna_instrument = None
 
+# Motor controller settings
+MOTOR_PORT = "/dev/ttyACM0"  # Arduino serial port
+motor_serial = None
+current_azimuth = 0.0
+current_elevation = 0.0
+
+# Sweep state
+sweep_active = False
+sweep_type = None  # "azimuth" or "elevation"
+sweep_data: List[Dict] = []  # List of {degree, amplitude} points
+
 
 async def websocket_handler(websocket):
     """Handle WebSocket connections from Flutter app."""
+    global sweep_active, sweep_type, sweep_data, current_azimuth, current_elevation
+    
     print(f"Client connected: {websocket.remote_address}")
     WS_CLIENTS.add(websocket)
     
@@ -50,13 +75,51 @@ async def websocket_handler(websocket):
             try:
                 data = json.loads(message)
                 cmd = data.get("cmd", "")
+                action = data.get("action", "")
                 
                 if cmd == "PING":
                     await websocket.send(json.dumps({"response": "PONG"}))
+                    
                 elif cmd == "GET_RSL":
                     # Send current RSL reading
-                    rsl = -85.5 + random.uniform(-2, 2)
-                    await websocket.send(json.dumps({"rsl": rsl, "timestamp": time.time()}))
+                    rsl = get_vna_reading()
+                    await websocket.send(json.dumps({
+                        "rsl": rsl, 
+                        "timestamp": time.time(),
+                        "azimuth_degree": current_azimuth,
+                        "elevation_degree": current_elevation
+                    }))
+                    
+                elif cmd == "START_SWEEP":
+                    # Start a new sweep (azimuth or elevation)
+                    sweep_type = data.get("sweep_type", "azimuth")
+                    sweep_active = True
+                    sweep_data = []
+                    await websocket.send(json.dumps({
+                        "sweep_status": "started",
+                        "sweep_type": sweep_type
+                    }))
+                    print(f"Started {sweep_type} sweep")
+                    
+                elif cmd == "STOP_SWEEP":
+                    # Complete the sweep and send all collected data
+                    sweep_active = False
+                    await websocket.send(json.dumps({
+                        "sweep_status": "completed",
+                        "sweep_type": sweep_type,
+                        "sweep_data": sweep_data
+                    }))
+                    print(f"Completed {sweep_type} sweep with {len(sweep_data)} points")
+                    sweep_data = []
+                    
+                elif action == "start":
+                    # Legacy support for initial connection
+                    await websocket.send(json.dumps({
+                        "status": "ready",
+                        "rsl": get_vna_reading(),
+                        "azimuth_degree": current_azimuth,
+                        "elevation_degree": current_elevation
+                    }))
                     
             except json.JSONDecodeError:
                 await websocket.send(json.dumps({"error": "Invalid JSON"}))
@@ -72,7 +135,7 @@ async def websocket_handler(websocket):
         print(f"Client disconnected: {websocket.remote_address}")
 
 
-def connect_vna() -> Optional:
+def connect_vna() -> Optional[object]:
     """Connect to VNA instrument."""
     global vna_instrument
     if visa is None:
@@ -127,23 +190,101 @@ def get_vna_reading() -> float:
         return -85.5 + random.uniform(-2, 2)
 
 
+def connect_motor():
+    """Connect to Arduino motor controller."""
+    global motor_serial
+    if serial is None:
+        print("PySerial not available, motor control disabled")
+        return None
+    
+    try:
+        motor_serial = serial.Serial(MOTOR_PORT, 115200, timeout=2)
+        time.sleep(2)  # Wait for Arduino reset
+        
+        # Clear startup messages
+        while motor_serial.in_waiting > 0:
+            motor_serial.readline()
+        
+        # Test connection
+        motor_serial.write(b"STATUS\n")
+        motor_serial.flush()
+        time.sleep(0.2)
+        
+        if motor_serial.in_waiting > 0:
+            response = motor_serial.readline().decode('utf-8').strip()
+            print(f"Motor controller connected: {response}")
+            return motor_serial
+        else:
+            print("Motor controller not responding")
+            return None
+    except Exception as e:
+        print(f"Failed to connect to motor controller: {e}")
+        return None
+
+
+def query_motor_position():
+    """Query current motor position from Arduino."""
+    global current_azimuth, current_elevation, motor_serial
+    
+    if motor_serial is None or not motor_serial.is_open:
+        return
+    
+    try:
+        motor_serial.write(b"STATUS\n")
+        motor_serial.flush()
+        
+        start = time.time()
+        while motor_serial.in_waiting == 0 and (time.time() - start) < 0.3:
+            time.sleep(0.01)
+        
+        if motor_serial.in_waiting > 0:
+            response = motor_serial.readline().decode('utf-8').strip()
+            # Parse: "AZ=123.45 EL=67.89"
+            if 'AZ' in response and 'EL' in response:
+                parts = response.split()
+                for part in parts:
+                    if part.startswith('AZ'):
+                        current_azimuth = float(part.split('=')[1])
+                    elif part.startswith('EL'):
+                        current_elevation = float(part.split('=')[1])
+    except Exception:
+        pass  # Silent failure
+
+
 async def broadcast_signal_data():
     """Broadcast real VNA signal data to all connected clients."""
-    global vna_instrument
+    global vna_instrument, sweep_active, sweep_type, sweep_data
+    global current_azimuth, current_elevation
     
-    # Connect to VNA
+    # Connect to VNA and motor controller
     vna_instrument = connect_vna()
+    connect_motor()
     
     while True:
         if WS_CLIENTS:
+            # Query motor position
+            query_motor_position()
+            
             # Get real or simulated RSL data
             rsl_value = get_vna_reading()
             
+            # Build data packet
             data = {
                 "rsl": rsl_value,
                 "timestamp": time.time(),
-                "source": "vna" if vna_instrument else "simulated"
+                "source": "vna" if vna_instrument else "simulated",
+                "azimuth_degree": current_azimuth,
+                "elevation_degree": current_elevation
             }
+            
+            # If sweep is active, also include sweep data point
+            if sweep_active:
+                degree = current_azimuth if sweep_type == "azimuth" else current_elevation
+                sweep_point = {"degree": degree, "amplitude": rsl_value}
+                sweep_data.append(sweep_point)
+                data["sweep_active"] = True
+                data["sweep_type"] = sweep_type
+                data["sweep_point"] = sweep_point
             
             # Broadcast to all clients
             disconnected = set()
