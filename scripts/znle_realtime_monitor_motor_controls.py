@@ -49,12 +49,8 @@ except ImportError:
     print("Error: matplotlib not installed. Run: pip install matplotlib", file=sys.stderr)
     sys.exit(1)
 
-# PySerial for motor control
-try:
-    import serial
-except ImportError:
-    print("Error: pyserial not installed. Run: pip install pyserial", file=sys.stderr)
-    sys.exit(1)
+# Shared temp file path for reading motor position from GUI
+MOTOR_POS_FILE = '/tmp/antenna_aligner_motor_pos.txt'
 
 
 # =============================================================================
@@ -90,10 +86,9 @@ class RealtimeMonitorWithMotor:
         self.running = True
         
         # Motor control attributes
-        self.motor_ser = None
         self.motor_connected = False
-        self.current_az = 0.0
-        self.current_el = 0.0
+        self.current_az = 0
+        self.current_el = 0
         
         # VNA connection
         self.inst = None
@@ -177,65 +172,23 @@ class RealtimeMonitorWithMotor:
             sys.exit(1)
     
     def connect_motor(self):
-        """Establish connection to Arduino motor controller"""
-        try:
-            print(f"Connecting to motor controller on {self.motor_port}...")
-            self.motor_ser = serial.Serial(self.motor_port, 115200, timeout=2)
-            time.sleep(2)  # Wait for Arduino to reset
-            
-            # Clear any startup messages
-            while self.motor_ser.in_waiting > 0:
-                self.motor_ser.readline()
-            
-            # Test connection with STATUS command
-            self.motor_ser.write(b"STATUS\n")
-            self.motor_ser.flush()
-            time.sleep(0.2)
-            
-            if self.motor_ser.in_waiting > 0:
-                response = self.motor_ser.readline().decode('utf-8').strip()
-                print(f"Motor controller connected: {response}")
-                self.motor_connected = True
-                self.query_motor_position()  # Get initial position
-            else:
-                print("Warning: Motor controller not responding")
-                self.motor_connected = False
-        except Exception as e:
-            print(f"Warning: Could not connect to motor controller: {e}")
-            print("Continuing without motor position tracking...")
-            self.motor_connected = False
+        """Enable motor position tracking via shared temp file written by GUI."""
+        print(f"Motor tracking enabled - position will be read from GUI in real-time...")
+        # The GUI owns the serial port and writes current position to MOTOR_POS_FILE.
+        # We just mark motor as connected so CSV includes the Az/El columns.
+        self.motor_connected = True
+        print(f"Motor position source: {MOTOR_POS_FILE}")
     
     def query_motor_position(self):
-        """Query current motor position and update internal state"""
-        if not self.motor_connected or not self.motor_ser:
-            return
-        
+        """Read current motor position from shared position file written by GUI."""
         try:
-            self.motor_ser.write(b"STATUS\n")
-            self.motor_ser.flush()
-            
-            # Wait for response with timeout
-            start_time = time.time()
-            while self.motor_ser.in_waiting == 0 and (time.time() - start_time) < 0.5:
-                time.sleep(0.01)
-            
-            if self.motor_ser.in_waiting > 0:
-                response = self.motor_ser.readline().decode('utf-8').strip()
-                # Parse response: "AZ=123.45 EL=67.89" or similar format
-                if 'AZ' in response and 'EL' in response:
-                    parts = response.split()
-                    for part in parts:
-                        if part.startswith('AZ'):
-                            self.current_az = float(part.split('=')[1])
-                        elif part.startswith('EL'):
-                            self.current_el = float(part.split('=')[1])
-        except Exception as e:
-            # Silent failure - don't interrupt measurement
-            pass
-    # 
-    # def rotate_motor_relative(self, degrees):
-    #     """Rotate motor relative to current position"""
-    #     pass
+            with open(MOTOR_POS_FILE, 'r') as f:
+                content = f.read().strip()
+            az_str, el_str = content.split(',')
+            self.current_az = int(az_str)
+            self.current_el = int(el_str)
+        except Exception:
+            pass  # Keep last known position if file missing or unreadable
     
     def measure_amplitude(self):
         """Perform single measurement and return amplitude"""
@@ -361,14 +314,6 @@ class RealtimeMonitorWithMotor:
             try:
                 self.inst.close()
                 print("VNA connection closed")
-            except:
-                pass
-        
-        # Close motor connection
-        if self.motor_ser and self.motor_ser.is_open:
-            try:
-                self.motor_ser.close()
-                print("Motor connection closed")
             except:
                 pass
         

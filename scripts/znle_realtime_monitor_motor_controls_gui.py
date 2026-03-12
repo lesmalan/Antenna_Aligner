@@ -562,6 +562,12 @@ class RealtimeMonitorMotorGUI:
                 
                 self.current_az.set(az)
                 self.current_el.set(el)
+                # Write position to shared file so the backend monitor can log it
+                try:
+                    with open('/tmp/antenna_aligner_motor_pos.txt', 'w') as f:
+                        f.write(f"{az},{el}")
+                except Exception:
+                    pass
                 print(f"[Motor] Position updated: Az={az}, El={el}" + 
                       (f" (software offset: Az={self.home_offset_az}, El={self.home_offset_el})" if self.use_software_home else ""))
             except (IndexError, ValueError) as e:
