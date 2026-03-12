@@ -49,6 +49,13 @@ except ImportError:
     print("Error: matplotlib not installed. Run: pip install matplotlib", file=sys.stderr)
     sys.exit(1)
 
+# PySerial for motor control
+try:
+    import serial
+except ImportError:
+    print("Error: pyserial not installed. Run: pip install pyserial", file=sys.stderr)
+    sys.exit(1)
+
 
 # =============================================================================
 # TODO: Motor Control Integration
@@ -65,12 +72,13 @@ except ImportError:
 class RealtimeMonitorWithMotor:
     """Real-time VNA monitor with live plotting and motor control"""
     
-    def __init__(self, ip, port, freq, param, csv_path, max_points=1000, smoothing_window=10):
+    def __init__(self, ip, port, freq, param, csv_path, motor_port=None, max_points=1000, smoothing_window=10):
         self.ip = ip
         self.port = port
         self.target_freq = freq
         self.param = param
         self.csv_path = csv_path
+        self.motor_port = motor_port
         self.max_points = max_points
         self.smoothing_window = smoothing_window
         
@@ -81,21 +89,28 @@ class RealtimeMonitorWithMotor:
         self.start_time = time.time()
         self.running = True
         
-        # TODO: Motor control attributes
-        # self.motor_controller = None
-        # self.current_angle = 0.0
-        # self.motor_angles = deque(maxlen=max_points)
+        # Motor control attributes
+        self.motor_ser = None
+        self.motor_connected = False
+        self.current_az = 0.0
+        self.current_el = 0.0
         
         # VNA connection
         self.inst = None
         self.connect_vna()
         
+        # Motor connection
+        if self.motor_port:
+            self.connect_motor()
+        
         # CSV file
         self.csv_file = None
         if csv_path:
             self.csv_file = open(csv_path, 'w')
-            # TODO: Add motor angle column to CSV header
-            self.csv_file.write("Timestamp,Elapsed_Time_s,Frequency_Hz,Amplitude_Raw_dB,Amplitude_Smoothed_dB\n")
+            if self.motor_connected:
+                self.csv_file.write("Timestamp,Elapsed_Time_s,Frequency_Hz,Amplitude_Raw_dB,Amplitude_Smoothed_dB,Azimuth_deg,Elevation_deg\n")
+            else:
+                self.csv_file.write("Timestamp,Elapsed_Time_s,Frequency_Hz,Amplitude_Raw_dB,Amplitude_Smoothed_dB\n")
             self.csv_file.flush()
         
         # Setup plot
@@ -161,18 +176,62 @@ class RealtimeMonitorWithMotor:
             print(f"Error connecting to VNA: {e}", file=sys.stderr)
             sys.exit(1)
     
-    # TODO: Motor control methods
-    # def connect_motor(self, motor_ip, motor_port):
-    #     """Establish connection to motor controller"""
-    #     pass
-    # 
-    # def get_motor_angle(self):
-    #     """Get current motor angle"""
-    #     pass
-    # 
-    # def set_motor_angle(self, angle):
-    #     """Command motor to move to specific angle"""
-    #     pass
+    def connect_motor(self):
+        """Establish connection to Arduino motor controller"""
+        try:
+            print(f"Connecting to motor controller on {self.motor_port}...")
+            self.motor_ser = serial.Serial(self.motor_port, 115200, timeout=2)
+            time.sleep(2)  # Wait for Arduino to reset
+            
+            # Clear any startup messages
+            while self.motor_ser.in_waiting > 0:
+                self.motor_ser.readline()
+            
+            # Test connection with STATUS command
+            self.motor_ser.write(b"STATUS\n")
+            self.motor_ser.flush()
+            time.sleep(0.2)
+            
+            if self.motor_ser.in_waiting > 0:
+                response = self.motor_ser.readline().decode('utf-8').strip()
+                print(f"Motor controller connected: {response}")
+                self.motor_connected = True
+                self.query_motor_position()  # Get initial position
+            else:
+                print("Warning: Motor controller not responding")
+                self.motor_connected = False
+        except Exception as e:
+            print(f"Warning: Could not connect to motor controller: {e}")
+            print("Continuing without motor position tracking...")
+            self.motor_connected = False
+    
+    def query_motor_position(self):
+        """Query current motor position and update internal state"""
+        if not self.motor_connected or not self.motor_ser:
+            return
+        
+        try:
+            self.motor_ser.write(b"STATUS\n")
+            self.motor_ser.flush()
+            
+            # Wait for response with timeout
+            start_time = time.time()
+            while self.motor_ser.in_waiting == 0 and (time.time() - start_time) < 0.5:
+                time.sleep(0.01)
+            
+            if self.motor_ser.in_waiting > 0:
+                response = self.motor_ser.readline().decode('utf-8').strip()
+                # Parse response: "AZ=123.45 EL=67.89" or similar format
+                if 'AZ' in response and 'EL' in response:
+                    parts = response.split()
+                    for part in parts:
+                        if part.startswith('AZ'):
+                            self.current_az = float(part.split('=')[1])
+                        elif part.startswith('EL'):
+                            self.current_el = float(part.split('=')[1])
+        except Exception as e:
+            # Silent failure - don't interrupt measurement
+            pass
     # 
     # def rotate_motor_relative(self, degrees):
     #     """Rotate motor relative to current position"""
@@ -189,10 +248,6 @@ class RealtimeMonitorWithMotor:
             data_str = self.inst.query("CALC:DATA? FDATA")
             amplitude = float(data_str.strip())
             
-            # TODO: Also get motor angle here
-            # motor_angle = self.get_motor_angle()
-            # return amplitude, motor_angle
-            
             return amplitude
         except Exception as e:
             print(f"Measurement error: {e}", file=sys.stderr)
@@ -203,7 +258,7 @@ class RealtimeMonitorWithMotor:
         if not self.running:
             return self.line, self.value_text
         
-        # Measure amplitude (and motor angle in future)
+        # Measure amplitude
         amplitude = self.measure_amplitude()
         
         if amplitude is not None:
@@ -213,7 +268,6 @@ class RealtimeMonitorWithMotor:
             # Store raw data
             self.times.append(elapsed)
             self.raw_amplitudes.append(amplitude)
-            # TODO: self.motor_angles.append(motor_angle)
             
             # Calculate smoothed amplitude (rolling average)
             if self.smoothing_window > 1 and len(self.raw_amplitudes) >= self.smoothing_window:
@@ -226,11 +280,17 @@ class RealtimeMonitorWithMotor:
             
             self.amplitudes.append(smoothed_amplitude)
             
+            # Query motor position if connected
+            if self.motor_connected:
+                self.query_motor_position()
+            
             # Write raw data to CSV (preserve original measurements)
             if self.csv_file:
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
-                # TODO: Add motor angle to CSV output
-                self.csv_file.write(f"{timestamp},{elapsed:.3f},{self.target_freq},{amplitude:.3f},{smoothed_amplitude:.3f}\n")
+                if self.motor_connected:
+                    self.csv_file.write(f"{timestamp},{elapsed:.3f},{self.target_freq},{amplitude:.3f},{smoothed_amplitude:.3f},{self.current_az:.2f},{self.current_el:.2f}\n")
+                else:
+                    self.csv_file.write(f"{timestamp},{elapsed:.3f},{self.target_freq},{amplitude:.3f},{smoothed_amplitude:.3f}\n")
                 self.csv_file.flush()
             
             # Update plot data (using smoothed values)
@@ -260,14 +320,14 @@ class RealtimeMonitorWithMotor:
             
             # Update value text
             smooth_info = f" (smoothed)" if self.smoothing_window > 1 else ""
-            # TODO: Add motor angle to display
-            self.value_text.set_text(f'Current: {smoothed_amplitude:.2f} dB{smooth_info}\nRaw: {amplitude:.2f} dB\nTime: {elapsed:.1f} s\nPoints: {len(self.times)}')
+            motor_info = f"\nAz: {self.current_az:.1f}° El: {self.current_el:.1f}°" if self.motor_connected else ""
+            self.value_text.set_text(f'Current: {smoothed_amplitude:.2f} dB{smooth_info}\nRaw: {amplitude:.2f} dB\nTime: {elapsed:.1f} s\nPoints: {len(self.times)}{motor_info}')
             
             # Print to console every 10 measurements
             if len(self.times) % 10 == 0:
                 smooth_info = f"  Smoothed={smoothed_amplitude:.2f} dB" if self.smoothing_window > 1 else ""
-                # TODO: Add motor angle to console output
-                print(f"t={elapsed:.1f}s  Raw={amplitude:.2f} dB{smooth_info}  Points={len(self.times)}")
+                motor_info = f"  Az={self.current_az:.1f}° El={self.current_el:.1f}°" if self.motor_connected else ""
+                print(f"t={elapsed:.1f}s  Raw={amplitude:.2f} dB{smooth_info}{motor_info}  Points={len(self.times)}")
         
         return self.line, self.value_text
     
@@ -304,13 +364,13 @@ class RealtimeMonitorWithMotor:
             except:
                 pass
         
-        # TODO: Close motor connection
-        # if self.motor_controller:
-        #     try:
-        #         self.motor_controller.close()
-        #         print("Motor connection closed")
-        #     except:
-        #         pass
+        # Close motor connection
+        if self.motor_ser and self.motor_ser.is_open:
+            try:
+                self.motor_ser.close()
+                print("Motor connection closed")
+            except:
+                pass
         
         if self.csv_file:
             try:
@@ -333,11 +393,9 @@ def main():
     ap.add_argument("--port", default=5025, type=int,
                    help="SCPI port (default: 5025)")
     
-    # TODO: Motor control arguments
-    # ap.add_argument("--motor-ip", default="192.168.15.X",
-    #                help="Motor controller IP address")
-    # ap.add_argument("--motor-port", default=XXXX, type=int,
-    #                help="Motor controller port")
+    # Motor control arguments
+    ap.add_argument("--motor-port", default=None,
+                   help="Serial port for motor controller (e.g., /dev/ttyACM0)")
     
     # Measurement parameters
     ap.add_argument("--freq", type=float, required=True,
@@ -373,7 +431,10 @@ def main():
     print(f"Measurement Interval: {args.interval} ms")
     print(f"Smoothing Window: {args.smoothing} samples")
     print(f"CSV Output: {csv_path}")
-    # TODO: Print motor connection info
+    if args.motor_port:
+        print(f"Motor Controller: {args.motor_port}")
+    else:
+        print("Motor Controller: Not connected")
     print("="*60)
     print()
     
@@ -384,6 +445,7 @@ def main():
         freq=args.freq,
         param=args.param,
         csv_path=csv_path,
+        motor_port=args.motor_port,
         max_points=args.max_points,
         smoothing_window=args.smoothing
     )

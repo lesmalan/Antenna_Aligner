@@ -331,10 +331,9 @@ class RealtimeMonitorMotorGUI:
         cmd.extend(["--interval", self.interval.get()])
         cmd.extend(["--smoothing", self.smoothing_window.get()])
         
-        # TODO: Add motor control arguments
-        # if self.motor_enabled.get():
-        #     cmd.extend(["--motor-ip", self.motor_ip.get()])
-        #     cmd.extend(["--motor-port", self.motor_port.get()])
+        # Add motor port if connected
+        if self.motor_connected and self.motor_port.get():
+            cmd.extend(["--motor-port", self.motor_port.get()])
         
         return cmd
     
