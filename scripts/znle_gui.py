@@ -365,7 +365,7 @@ class ZNLE_GUI:
         
         # Cancel any pending timer updates
         if self.timer_update_id:
-            self.root.after_cancel(self.timer_update_id)
+            self.root.after_cancel(self.timer_update_id)l
             self.timer_update_id = None
 
 

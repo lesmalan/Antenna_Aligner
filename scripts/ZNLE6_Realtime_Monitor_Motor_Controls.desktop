@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=ZNLE6 Real-Time Monitor + Motors
+Comment=Real-time signal monitoring with motor control integration
+Exec=/home/sd2-group2/Documents/SD2_Codespace/Antenna_Aligner/.venv/bin/python3 /home/sd2-group2/Documents/SD2_Codespace/Antenna_Aligner/scripts/znle_realtime_monitor_motor_controls_gui.py
+Icon=applications-science
+Terminal=false
+Categories=Science;Education;Engineering;
+Path=/home/sd2-group2/Documents/SD2_Codespace/Antenna_Aligner

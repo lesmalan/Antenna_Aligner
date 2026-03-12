@@ -138,13 +138,48 @@ class AntennaAlignerGUI:
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        # Left column: Control panels
-        left_frame = ttk.Frame(main_frame)
-        left_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 10))
+        # Left column: Scrollable control panels
+        # Create a canvas for scrolling
+        left_canvas = tk.Canvas(main_frame, borderwidth=0, highlightthickness=0)
+        left_scrollbar = ttk.Scrollbar(main_frame, orient="vertical", command=left_canvas.yview)
+        left_canvas.configure(yscrollcommand=left_scrollbar.set)
+        
+        left_canvas.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S), padx=(0, 5))
+        left_scrollbar.grid(row=0, column=1, sticky=(tk.N, tk.S), padx=(0, 10))
+        
+        # Frame inside canvas for all controls
+        left_frame = ttk.Frame(left_canvas)
+        left_canvas_window = left_canvas.create_window((0, 0), window=left_frame, anchor="nw")
+        
+        # Configure canvas scrolling
+        def configure_scroll_region(event=None):
+            left_canvas.configure(scrollregion=left_canvas.bbox("all"))
+        
+        def configure_canvas_width(event):
+            canvas_width = event.width
+            left_canvas.itemconfig(left_canvas_window, width=canvas_width)
+        
+        left_frame.bind("<Configure>", configure_scroll_region)
+        left_canvas.bind("<Configure>", configure_canvas_width)
+        
+        # Enable mouse wheel scrolling
+        def on_mousewheel(event):
+            left_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def on_mousewheel_linux(event):
+            if event.num == 4:
+                left_canvas.yview_scroll(-1, "units")
+            elif event.num == 5:
+                left_canvas.yview_scroll(1, "units")
+        
+        # Bind mouse wheel events
+        left_canvas.bind_all("<MouseWheel>", on_mousewheel)  # Windows/Mac
+        left_canvas.bind_all("<Button-4>", on_mousewheel_linux)  # Linux scroll up
+        left_canvas.bind_all("<Button-5>", on_mousewheel_linux)  # Linux scroll down
         
         # Right column: Plot display
         right_frame = ttk.Frame(main_frame)
-        right_frame.grid(row=0, column=1, sticky=(tk.W, tk.E, tk.N, tk.S))
+        right_frame.grid(row=0, column=2, sticky=(tk.W, tk.E, tk.N, tk.S))
         
         # ==================================================================
         # LEFT COLUMN: Control Panels
@@ -365,6 +400,9 @@ class AntennaAlignerGUI:
         ttk.Button(control_frame, text="Save Data", 
                   command=self.save_data).grid(row=1, column=1, pady=5, padx=5, sticky=(tk.W, tk.E))
         
+        ttk.Button(control_frame, text="Load Demo Data", 
+                  command=self.load_demo_data).grid(row=2, column=0, columnspan=2, pady=5, padx=5, sticky=(tk.W, tk.E))
+        
         control_frame.columnconfigure(0, weight=1)
         control_frame.columnconfigure(1, weight=1)
         
@@ -433,8 +471,9 @@ class AntennaAlignerGUI:
         # ==================================================================
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
-        main_frame.columnconfigure(0, weight=0)  # Left column fixed width
-        main_frame.columnconfigure(1, weight=1)  # Right column expands
+        main_frame.columnconfigure(0, weight=0)  # Left canvas fixed width
+        main_frame.columnconfigure(1, weight=0)  # Scrollbar
+        main_frame.columnconfigure(2, weight=1)  # Right column expands
         main_frame.rowconfigure(0, weight=1)
         left_frame.rowconfigure(row-1, weight=1)  # Log expands
         right_frame.columnconfigure(0, weight=1)
@@ -1018,6 +1057,104 @@ class AntennaAlignerGUI:
             self.data_count_var.set("0")
             self.update_plot()
             self.log("Data cleared")
+    
+    def load_demo_data(self):
+        """Load fake demonstration data based on current scan mode."""
+        import numpy as np
+        
+        mode = self.scan_mode.get()
+        self.scan_data = []
+        
+        if mode == "azimuth":
+            # Generate azimuth sweep demo data (Gaussian-like pattern with noise)
+            start_az = self.scan_start_az.get()
+            stop_az = self.scan_stop_az.get()
+            step_az = self.scan_step_az.get()
+            fixed_el = self.scan_el_fixed.get()
+            
+            azimuths = range(start_az, stop_az + 1, step_az)
+            
+            # Create a Gaussian-like peak at 0 degrees azimuth
+            for az in azimuths:
+                # Main lobe: Gaussian centered at 0 degrees
+                main_lobe = -5 * np.exp(-0.002 * (az - 0)**2)
+                
+                # Side lobes
+                side_lobe1 = -15 * np.exp(-0.001 * (az - 45)**2)
+                side_lobe2 = -15 * np.exp(-0.001 * (az + 45)**2)
+                
+                # Noise floor around -35 dB
+                noise = np.random.normal(-35, 1.5)
+                
+                # Combine all components
+                amplitude = max(main_lobe + side_lobe1 + side_lobe2, noise)
+                
+                self.scan_data.append((az, fixed_el, amplitude))
+            
+            self.log(f"Loaded demo azimuth scan: {len(self.scan_data)} points")
+        
+        elif mode == "elevation":
+            # Generate elevation sweep demo data
+            start_el = self.scan_start_el.get()
+            stop_el = self.scan_stop_el.get()
+            step_el = self.scan_step_el.get()
+            current_az = self.current_az.get()
+            
+            elevations = range(start_el, stop_el + 1, step_el)
+            
+            # Create a pattern with peak around 0 degrees elevation
+            for el in elevations:
+                # Main beam pattern
+                main_beam = -8 * np.exp(-0.01 * (el - 0)**2)
+                
+                # Noise floor
+                noise = np.random.normal(-30, 1.0)
+                
+                amplitude = max(main_beam, noise)
+                
+                self.scan_data.append((current_az, el, amplitude))
+            
+            self.log(f"Loaded demo elevation scan: {len(self.scan_data)} points")
+        
+        else:  # 2D mode
+            # Generate 2D grid demo data
+            start_az = self.scan_start_az.get()
+            stop_az = self.scan_stop_az.get()
+            step_az = self.scan_step_az.get()
+            start_el = self.scan_start_el.get()
+            stop_el = self.scan_stop_el.get()
+            step_el = self.scan_step_el.get()
+            
+            azimuths = range(start_az, stop_az + 1, step_az)
+            elevations = range(start_el, stop_el + 1, step_el)
+            
+            # Create 2D antenna pattern with main lobe and side lobes
+            for az in azimuths:
+                for el in elevations:
+                    # Main lobe at (0, 0)
+                    main_lobe = -5 * np.exp(-0.002 * az**2 - 0.01 * el**2)
+                    
+                    # Side lobes
+                    side_lobe1 = -18 * np.exp(-0.001 * (az - 30)**2 - 0.008 * (el - 5)**2)
+                    side_lobe2 = -18 * np.exp(-0.001 * (az + 30)**2 - 0.008 * (el + 5)**2)
+                    
+                    # Noise floor
+                    noise = np.random.normal(-40, 2.0)
+                    
+                    amplitude = max(main_lobe + side_lobe1 + side_lobe2, noise)
+                    
+                    self.scan_data.append((az, el, amplitude))
+            
+            self.log(f"Loaded demo 2D scan: {len(self.scan_data)} points")
+        
+        # Update display
+        self.data_count_var.set(str(len(self.scan_data)))
+        self.update_plot()
+        self.status_label.config(text="Demo data loaded", foreground="blue")
+        
+        # Update scan mode display
+        mode_display = {"azimuth": "Azimuth", "elevation": "Elevation", "2d": "2D Grid"}[mode]
+        self.scan_mode_display.config(text=mode_display)
     
     def save_data(self):
         """Save scan data to CSV file."""

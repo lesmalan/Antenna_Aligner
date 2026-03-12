@@ -36,6 +36,7 @@ class FrequencyScannerGUI:
         # Scan parameters
         self.points = tk.StringVar(value="401")
         self.receiver_port = tk.StringVar(value="1")
+        self.s_parameter = tk.StringVar(value="S22")
         self.threshold_db = tk.StringVar(value="5.0")
         self.min_bandwidth = tk.StringVar(value="10.0")
         
@@ -91,6 +92,16 @@ class FrequencyScannerGUI:
                         value="1").pack(side=tk.LEFT, padx=5)
         ttk.Radiobutton(port_frame, text="Port 2", variable=self.receiver_port, 
                         value="2").pack(side=tk.LEFT, padx=5)
+        row += 1
+        
+        ttk.Label(main_frame, text="S-Parameter:").grid(row=row, column=0, sticky=tk.W, pady=2)
+        s_param_frame = ttk.Frame(main_frame)
+        s_param_frame.grid(row=row, column=1, sticky=tk.W, pady=2)
+        s_param_combo = ttk.Combobox(s_param_frame, textvariable=self.s_parameter, 
+                                     values=["S11", "S12", "S21", "S22"], 
+                                     state="readonly", width=10)
+        s_param_combo.pack(side=tk.LEFT, padx=5)
+        ttk.Label(s_param_frame, text="(S11/S22=Reflection, S21/S12=Transmission)").pack(side=tk.LEFT, padx=5)
         row += 1
         
         # Separator
@@ -312,6 +323,7 @@ class FrequencyScannerGUI:
         # Scan parameters
         cmd.extend(["--points", self.points.get()])
         cmd.extend(["--receiver-port", self.receiver_port.get()])
+        cmd.extend(["--s-parameter", self.s_parameter.get()])
         cmd.extend(["--threshold-db", self.threshold_db.get()])
         cmd.extend(["--min-bandwidth", self.min_bandwidth.get()])
         

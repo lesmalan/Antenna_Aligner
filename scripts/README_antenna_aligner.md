@@ -42,6 +42,12 @@ The Antenna Aligner GUI integrates VNA signal monitoring with motor control for 
 - Automatically save plot images
 - Timestamped filenames
 
+### Demo Data
+- **Load Demo Data** button for demonstrations
+- Generates realistic fake antenna patterns
+- No hardware required for testing/training
+- See [DEMO_DATA_GUIDE.md](DEMO_DATA_GUIDE.md) for details
+
 ## Hardware Requirements
 
 1. **VNA**: R&S ZNLE6 Vector Network Analyzer

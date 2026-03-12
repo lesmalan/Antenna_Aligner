@@ -1,200 +1,3 @@
-Real-Time Monitor with Motor Control Integration - 03/11/26
-============================================================
-
-1. Created Motor Control Version of Real-Time Monitor
-   - New files: znle_realtime_monitor_motor_controls.py and znle_realtime_monitor_motor_controls_gui.py
-   - Separate version preserving original non-motor files
-   - Desktop launcher: ZNLE6_Realtime_Monitor_Motor_Controls.desktop
-   - Combines VNA real-time monitoring with Arduino motor control
-   - Independent GUI sections: "Monitor Control" and "Manual Motor Control"
-   - Test utility: test_motor_connection.py for Arduino debugging
-
-2. Motor Control Integration
-   - Integrated full motor control system from antenna_aligner_gui.py
-   - Serial port scanning and connection via Motor Controller section
-   - Arduino communication at 115200 baud rate
-   - Supported commands: AZ, EL, AZABS, ELABS, HOME, SETZERO, STOP, STATUS, SPEED
-   - Manual Motor Control section with absolute/relative movement
-   - Real-time position display for azimuth and elevation
-   - Non-blocking motor connection using threading
-   - Status feedback for all motor operations
-
-3. Fixed Motor Communication Bugs
-   - Threading fix: Moved connection to background thread to prevent GUI freeze
-   - Command bug: Fixed critical '\n' vs '\\n' newline character error
-   - Timeout handling: Added 1-second timeout with polling loop for responses
-   - Debug output: Added [Motor] prefix for all motor operations
-   - Connection callbacks: connection_success() and connection_failed() methods
-   - Serial buffer clearing for clean communication
-
-4. Home Position Calibration Feature
-   - Added "Set Current as Home" button for home position calibration
-   - Primary method: SETZERO command (hardware-based zeroing)
-   - Automatic command detection and error handling
-   - Position tracking with offset support for software mode
-   - Goto Home button respects calibrated home position
-
-5. Software Home Calibration Fallback
-   - Implemented software-based home calibration for older Arduino firmware
-   - Automatically activates when hardware SETZERO command not supported
-   - Variables: use_software_home, home_offset_az, home_offset_el
-   - Applies offsets in update_motor_position() method
-   - Transparent operation - user experience identical for both modes
-   - Status message indicates which mode is active
-   - Works with any firmware version
-
-6. Fixed Y-Axis Auto-Scaling on Real-Time Plot
-   - Issue: Y-axis didn't adjust for significant amplitude jumps
-   - Root cause 1: Scaling centered on mean instead of actual data range
-   - Root cause 2: FuncAnimation blit=True caching axes background
-   - Solution 1: Changed to min/max based scaling with proportional margins
-     * Uses actual minimum and maximum values from data
-     * 15% margin above and below (minimum 2 dB)
-     * Fixed 5 dB margin for small ranges (<5 dB)
-   - Solution 2: Changed blit=False to allow full axes redraw
-   - Result: Y-axis now dynamically adjusts to show full signal range
-
-7. Motor Control Architecture
-   - Dual-mode operation: hardware commands or software offsets
-   - Position update thread for continuous monitoring
-   - Thread-safe GUI updates using root.after()
-   - Graceful error handling for connection failures
-   - Status display with connection state and current position
-   - Emergency stop button for safety
-   - Speed control (1-10 units)
-
-8. File Organization
-   - Original files preserved: znle_realtime_monitor.py, znle_realtime_monitor_gui.py, ZNLE6_Realtime_Monitor.desktop
-   - Motor control versions separate and independent
-   - Documentation: arduino/FIRMWARE_UPDATE_INSTRUCTIONS.md
-   - CSV output structure ready for motor angle logging (TODO markers in place)
-
-9. Documentation and Testing
-   - Created test_motor_connection.py for Arduino verification
-   - Interactive command testing with SETZERO support
-   - FIRMWARE_UPDATE_INSTRUCTIONS.md for upgrading Arduino code
-   - Debug output for troubleshooting motor communication
-   - Comprehensive error messages for connection issues
-
-10. Use Cases
-   - Manual antenna alignment while monitoring signal in real-time
-   - Testing motor positioning accuracy at specific signal conditions
-   - Calibrating home position for consistent reference point
-   - Debugging Arduino motor controller communication
-   - Future: Automated scanning patterns with live signal monitoring
-
-Usage:
-   - GUI: python3 scripts/znle_realtime_monitor_motor_controls_gui.py
-   - Desktop: Double-click "ZNLE6 Real-Time Monitor with Motor Control" icon
-   - Testing: python3 scripts/test_motor_connection.py
-
-
-Real-Time Signal Monitor with Smoothing - 03/10/26
-===================================================
-
-1. Created Real-Time Signal Monitor (znle_realtime_monitor.py)
-   - New continuous monitoring tool with live matplotlib animation
-   - Measures signal amplitude at single target frequency repeatedly
-   - Real-time plot display: amplitude (y-axis) vs time (x-axis)
-   - Live-updating graph using matplotlib FuncAnimation
-   - In-memory buffer (deque) for efficient rolling data storage
-   - Maximum 1000 points displayed on plot (older data auto-removed)
-   - Continuous CSV logging of all measurements with timestamps
-   - Graceful shutdown on Ctrl+C or plot window close
-
-2. Real-Time Monitor GUI (znle_realtime_monitor_gui.py)
-   - Graphical interface for easy configuration and launching
-   - Connection settings: IP address and port (same as ZNLE Controller)
-   - Measurement settings:
-     * Target frequency input (single frequency in Hz)
-     * S-parameter dropdown: S11, S12, S21, S22
-     * Update interval: configurable measurement rate (100-10000 ms)
-     * Smoothing window: rolling average of N samples (1-100)
-   - Output settings: CSV directory and filename (same as other tools)
-   - Control buttons: Start, Stop, Help
-   - Information panel with usage tips
-
-3. Smoothing Functionality
-   - Rolling average smoothing to reduce measurement noise
-   - Configurable smoothing window parameter (default: 10 samples)
-   - GUI input field with validation (1-100 samples)
-   - Dual data storage:
-     * raw_amplitudes: original measurements preserved
-     * amplitudes: smoothed values for plotting
-   - Enhanced CSV output with both raw and smoothed columns:
-     * Amplitude_Raw_dB: original VNA measurement
-     * Amplitude_Smoothed_dB: rolling average of last N samples
-   - Real-time smoothing calculation using numpy.mean()
-   - Plot displays smoothed data for cleaner visualization
-   - Plot title indicates smoothing status: "(smoothed: N samples)"
-   - Info box shows both current smoothed and raw values
-   - Console output displays both raw and smoothed amplitudes
-   - Smoothing window = 1 disables smoothing (plots raw data)
-
-4. Live Plotting Architecture
-   - matplotlib FuncAnimation for continuous updates
-   - Data flow: VNA → memory buffer → plot (not file-based)
-   - Parallel CSV writing for data persistence
-   - No disk I/O delay in plotting loop
-   - Auto-scaling y-axis based on signal range
-   - Expanding x-axis as time progresses
-   - Efficient FIFO buffer using collections.deque
-
-5. VNA Configuration for Real-Time Monitoring
-   - Single frequency point measurement (CW mode)
-   - Averaging disabled (SENS:AVER OFF) for fast updates
-   - Log magnitude format (dB)
-   - ASCII data format for easy parsing
-   - Manual trigger mode (INIT:CONT OFF)
-   - Configurable S-parameter selection
-   - 10 second timeout per measurement
-
-6. Data Output and Logging
-   - CSV format: Timestamp, Elapsed_Time_s, Frequency_Hz, Amplitude_Raw_dB, Amplitude_Smoothed_dB
-   - Timestamped filenames: {filename}_{timestamp}.csv
-   - Millisecond precision timestamps
-   - All measurements logged regardless of plot display limit
-   - Data preserved even when plot buffer rolls over (>1000 points)
-   - CSV written and flushed after each measurement for data safety
-
-7. Desktop Integration
-   - Created ZNLE6_Realtime_Monitor.desktop launcher
-   - Single-click access from desktop icon
-   - Uses virtual environment Python interpreter
-   - Icon: applications-science
-   - Categories: Science, Education, Engineering
-
-8. Documentation
-   - Created README_realtime_monitor.md with comprehensive guide
-   - Usage examples for GUI and command line
-   - S-parameter selection guide for different hardware setups
-   - Hardware configuration examples (two-antenna and single-antenna)
-   - Troubleshooting section
-   - Performance notes and optimization tips
-   - Data flow architecture explanation
-
-9. Use Cases
-   - Antenna alignment: monitor signal while adjusting position
-   - Signal stability testing: track variations over time
-   - Dynamic signal tracking: follow rapidly changing signals
-   - Amplifier testing: verify gain stability
-   - Link quality monitoring: continuous transmission monitoring
-
-10. Technical Features
-   - Configurable update interval (default: 500ms = 2 Hz)
-   - Non-blocking operation using threading
-   - Thread-safe GUI updates with root.after()
-   - Automatic resource cleanup on shutdown
-   - VNA connection verification with *IDN? query
-   - Error handling for measurement failures
-   - Process management for graceful termination
-
-Usage:
-   - GUI: python3 znle_realtime_monitor_gui.py
-   - Command line: python3 znle_realtime_monitor.py --freq 977e6 --param S21 --smoothing 10
-   - Desktop: Double-click "ZNLE6 Real-Time Monitor" icon
-
-
 Frequency Scanner Timeout Fix and S-Parameter Selection - 03/10/26
 ===================================================================
 
@@ -455,122 +258,6 @@ Documentation Updates - 02/11/26
    - Base structure with 4 legs for stability
 
 
-Frequency Scanner Tool and Enhancements - 02/06/26
-==================================================
-
-1. Created find_quiet_frequencies.py - RF Noise Floor Scanner
-   - Scans frequency ranges to identify low-noise bands for RF transmission
-   - Uses ZNLE6 VNA + Pasco WA-9800A receiver to measure background RF noise
-   - Analyzes spectrum to find quiet (low-noise) frequency bands
-   - Identifies bands below configurable noise threshold
-   - Provides frequency recommendations for NanoVNA transmission experiments
-
-2. Frequency Scanner Features
-   - Dual frequency input modes: Center+Span or Start+Stop
-   - Configurable scan parameters: points, threshold, minimum bandwidth
-   - Automatic quiet band detection with configurable sensitivity
-   - Statistical analysis: mean, median, min, max, standard deviation
-   - Visual identification of quiet bands (highlighted in green on plots)
-   - CSV export option for raw frequency vs power data
-   - Comprehensive terminal output with recommendations
-
-3. Created frequency_scanner_gui.py - GUI for Frequency Scanner
-   - Graphical interface for find_quiet_frequencies.py
-   - Connection settings: IP address, port, receiver port selection
-   - Frequency mode toggle: Center+Span or Start+Stop
-   - Quick preset buttons: 900 MHz ±100 MHz, 2.4 GHz ±100 MHz, 5 GHz ±200 MHz
-   - Scan parameters: points, quiet threshold (dB), minimum bandwidth (MHz)
-   - Custom filename input for organized data storage
-   - Separate directory selectors for CSV and plot outputs
-   - Real-time scan output display with scrollable text area
-   - Help button with built-in documentation
-   - Start/Stop buttons with status feedback
-
-4. Desktop Integration
-   - Created Frequency_Scanner.desktop launcher
-   - Single-click access from desktop icon
-   - Saved in repository at scripts/Frequency_Scanner.desktop
-   - Configured with virtual environment Python interpreter
-   - Proper working directory and startup settings
-
-5. GitHub Connection and Repository Fixes
-   - Set up automatic GitHub authentication using GitHub CLI (gh)
-   - Configured git to use gh credentials with "gh auth setup-git"
-   - Fixed corrupted git repository objects
-   - Created recover_git_repo.sh script for future repository repairs
-   - Recovered from empty object file errors
-   - Repository now properly connected to github.com/lesmalan/Antenna_Aligner.git
-   - GitHub authentication persists across system reboots
-
-6. Monitor Mode Y-Axis Scaling Enhancement (znle_pyvisa.py)
-   - Updated time-series plots to use consistent y-axis scaling
-   - Y-axis now set to average ± 2.5 dB for all monitor mode measurements
-   - Calculates average amplitude across entire measurement duration
-   - Displays average and y-axis range in console output
-   - Enables direct visual comparison between different alignment runs
-   - Prevents auto-scaling from hiding small signal variations
-
-7. Output File Management Improvements
-   - Added --csv-dir, --plots-dir, --filename arguments to find_quiet_frequencies.py
-   - Fixed plot/CSV saving to respect user-specified directories
-   - Files now saved with custom base filename plus timestamp
-   - GUI properly passes directory and filename parameters to backend script
-   - Format: {filename}_{timestamp}.csv and {filename}_{timestamp}.png
-   - Directories automatically created if they don't exist
-
-8. Documentation and Change Tracking
-   - Created vscode_github_commands.txt with GitHub connection instructions
-   - Documented authentication setup for VS Code integration
-   - Recorded all changes in CHANGES.txt following established format conventions
-   - Preserved complete history of tools created and modifications made
-
-9. Enhanced Error Reporting (frequency_scanner_gui.py)
-   - Implemented comprehensive input validation with field-specific error messages
-   - Added stderr capture for subprocess error handling
-   - Categorized exceptions: FileNotFoundError, PermissionError, general exceptions
-   - Added full traceback logging to scan output display
-   - Provides examples of valid input formats in error messages
-   - Validates IP address, port numbers, frequency values, and scan parameters
-   - Shows specific field names and constraints when validation fails
-
-10. Bug Fix - Missing Import Statement (find_quiet_frequencies.py)
-   - Added missing "import os" at line 13
-   - Fixed NameError that prevented directory creation and file operations
-   - Required for os.path.join() and os.makedirs() function calls
-
-11. Plot Enhancement - Quietest Frequency Marker
-   - Added red star marker on plot to indicate quietest detected frequency
-   - Marker placed at minimum power point across entire spectrum
-   - Legend entry: "Quietest: {frequency} MHz at {power} dBm"
-   - Provides quick visual identification of optimal transmission frequency
-
-12. Non-Blocking Plot Display (find_quiet_frequencies.py)
-   - Removed plt.show() which was blocking script execution
-   - Script now completes immediately after scan finishes
-   - Replaced with plt.close() to free memory resources
-   - Added automatic plot opening using xdg-open subprocess
-   - Plot opens in default image viewer as separate non-blocking process
-   - GUI now shows "Scan complete!" message immediately
-   - Enables continuous scanning operations without manual window management
-   - Fixes issue where scan appeared frozen until matplotlib window was closed
-
-Usage - Frequency Scanner:
-   - Launch GUI: Double-click "Frequency Scanner" desktop icon
-   - Or from terminal: python3 scripts/frequency_scanner_gui.py
-   - Command line: python3 scripts/find_quiet_frequencies.py --center 900e6 --span 200e6
-   - Select frequency range (presets or custom)
-   - Configure scan parameters and output filename
-   - Click "Start Scan" to begin measurement
-   - View real-time progress and results
-   - Check Plots/ directory for visual analysis
-   - Use recommended frequency for NanoVNA transmission experiments
-
-Dependencies Added:
-   - numpy (for statistical analysis and array operations)
-   - subprocess (Python standard library, for automatic plot opening)
-   - All matplotlib and pyvisa dependencies already present from previous tools
-
-
 Code Optimization and Documentation - 02/06/26
 ================================================
 
@@ -651,49 +338,45 @@ Code Optimization and Documentation - 02/06/26
    - Verified command-line argument parsing works correctly
    - All optimizations maintain backward compatibility
 
+==================================
+Changes to znle_pyvisa.py Script - 01/28/26
+==================================
 
-File Recovery from Commit Issues - 02/05/26
-===========================================
+1. VNA Port Configuration
+   - Added CALC:PAR:PORT 1 command to explicitly set VNA to read from port 1
 
-1. Recovered znle_gui.py
-   - File was lost in commit 49b68f4 ("whatever") on 02/04/26
-   - Retrieved complete file from commit a595a1b (GUI_version01)
-   - Restored all GUI functionality for VNA control
-   - 404 lines of tkinter-based interface code recovered
+2. Plotting Functionality
+   - Added matplotlib library for data visualization
+   - Added --plot command-line flag to enable graphing
+   - Plots display amplitude (dB) vs frequency (GHz)
+   - Graphs are saved as PNG files (e.g., trace_plot.png) in the working directory
 
-2. Recovered CHANGES.txt Documentation
-   - Lost entire "GUI Application for ZNLE6 Control - 02/04/26" section
-   - Restored 83 lines of detailed change documentation
-   - Recovered all 11 subsections documenting GUI features and updates
-   - Retrieved from git commit history using git show
+3. Time-Series Monitoring Mode
+   - Added --monitor flag for antenna alignment mode
+   - Plots amplitude vs time instead of frequency
+   - Takes repeated measurements over specified duration (default: 60 seconds)
+   - Monitors amplitude at a specific frequency or tracks maximum across sweep
+   - Added --monitor-freq flag (default: 1 GHz)
+   - Added --duration flag to set monitoring time (default: 60 seconds)
+   - Added --interval flag to set measurement interval (default: 1 second)
 
-3. Recreated ZNLE6_Controller.desktop
-   - Desktop launcher file existed on Desktop but not in repository
-   - Copied launcher configuration to repository for version control
-   - Preserves virtual environment Python path and working directory settings
+4. Hardware Configuration Updates (01/28/26)
+   - Changed default frequency range to 900-1500 MHz (NanoVNA-H4 output range)
+   - Changed default measurement parameter from S21 to S11
+   - Updated for new receiver configuration: external signal feeds directly to ZNLE6 port 1
+   - New hardware: NanoVNA-H4 transmitter + RFSpace UWB antenna (900-12000 MHz)
+   - New receiver: Pasco WA-9800a connected directly to ZNLE6 port 1
 
-4. Recreated Output Directories
-   - Created CSVs/ directory for data file storage
-   - Created Plots/ directory for graph image storage
-   - Both directories referenced in GUI but were missing from workspace
+5. Usage Examples
+   - Single sweep with plot: python znle_pyvisa.py --plot
+   - Monitor at 1 GHz for 60 seconds: python znle_pyvisa.py --monitor --plot
+   - Monitor for 2 minutes: python znle_pyvisa.py --monitor --plot --duration 120
+   - Custom monitoring frequency: python znle_pyvisa.py --monitor --plot --monitor-freq 1.2e9
+   - Frequent measurements: python znle_pyvisa.py --monitor --plot --interval 0.5
 
-5. Added Documentation for Raspberry Pi Server Integration
-   - Documented pi_tcp_server.py and pi_websocket_server.py features
-   - Added systemd service integration details
-   - Recorded Flutter app WebSocket updates from 02/04/26
-   - Ensured complete change history preservation
-
-
-Bug Fixes - 02/05/26
-====================
-
-1. Fixed Plot File Output Directory
-   - Corrected znle_pyvisa.py to respect PLOTS_DIR environment variable
-   - Plots now save to Plots directory when GUI specifies separate directories
-   - Previously plots were saved to CSV directory regardless of GUI settings
-   - Added os.environ.get('PLOTS_DIR') check in both monitor and frequency modes
-   - Maintains backward compatibility for command-line usage (saves alongside CSV)
-   - GUI-specified directory separation now works correctly for both CSVs and Plots
+Dependencies Added:
+   - matplotlib (installed via pip)
+   - time, datetime (Python standard library)
 
 
 GUI Application for ZNLE6 Control - 02/04/26
@@ -826,41 +509,161 @@ Dependencies Added:
    - pyvisa, pyvisa-py (for VNA instrument control)
 
 
-Changes to znle_pyvisa.py Script - 01/28/26
-============================================
+Bug Fixes - 02/05/26
+====================
 
-1. VNA Port Configuration
-   - Added CALC:PAR:PORT 1 command to explicitly set VNA to read from port 1
+1. Fixed Plot File Output Directory
+   - Corrected znle_pyvisa.py to respect PLOTS_DIR environment variable
+   - Plots now save to Plots directory when GUI specifies separate directories
+   - Previously plots were saved to CSV directory regardless of GUI settings
+   - Added os.environ.get('PLOTS_DIR') check in both monitor and frequency modes
+   - Maintains backward compatibility for command-line usage (saves alongside CSV)
+   - GUI-specified directory separation now works correctly for both CSVs and Plots
 
-2. Plotting Functionality
-   - Added matplotlib library for data visualization
-   - Added --plot command-line flag to enable graphing
-   - Plots display amplitude (dB) vs frequency (GHz)
-   - Graphs are saved as PNG files (e.g., trace_plot.png) in the working directory
 
-3. Time-Series Monitoring Mode
-   - Added --monitor flag for antenna alignment mode
-   - Plots amplitude vs time instead of frequency
-   - Takes repeated measurements over specified duration (default: 60 seconds)
-   - Monitors amplitude at a specific frequency or tracks maximum across sweep
-   - Added --monitor-freq flag (default: 1 GHz)
-   - Added --duration flag to set monitoring time (default: 60 seconds)
-   - Added --interval flag to set measurement interval (default: 1 second)
+File Recovery from Commit Issues - 02/05/26
+===========================================
 
-4. Hardware Configuration Updates (01/28/26)
-   - Changed default frequency range to 900-1500 MHz (NanoVNA-H4 output range)
-   - Changed default measurement parameter from S21 to S11
-   - Updated for new receiver configuration: external signal feeds directly to ZNLE6 port 1
-   - New hardware: NanoVNA-H4 transmitter + RFSpace UWB antenna (900-12000 MHz)
-   - New receiver: Pasco WA-9800a connected directly to ZNLE6 port 1
+1. Recovered znle_gui.py
+   - File was lost in commit 49b68f4 ("whatever") on 02/04/26
+   - Retrieved complete file from commit a595a1b (GUI_version01)
+   - Restored all GUI functionality for VNA control
+   - 404 lines of tkinter-based interface code recovered
 
-5. Usage Examples
-   - Single sweep with plot: python znle_pyvisa.py --plot
-   - Monitor at 1 GHz for 60 seconds: python znle_pyvisa.py --monitor --plot
-   - Monitor for 2 minutes: python znle_pyvisa.py --monitor --plot --duration 120
-   - Custom monitoring frequency: python znle_pyvisa.py --monitor --plot --monitor-freq 1.2e9
-   - Frequent measurements: python znle_pyvisa.py --monitor --plot --interval 0.5
+2. Recovered CHANGES.txt Documentation
+   - Lost entire "GUI Application for ZNLE6 Control - 02/04/26" section
+   - Restored 83 lines of detailed change documentation
+   - Recovered all 11 subsections documenting GUI features and updates
+   - Retrieved from git commit history using git show
+
+3. Recreated ZNLE6_Controller.desktop
+   - Desktop launcher file existed on Desktop but not in repository
+   - Copied launcher configuration to repository for version control
+   - Preserves virtual environment Python path and working directory settings
+
+4. Recreated Output Directories
+   - Created CSVs/ directory for data file storage
+   - Created Plots/ directory for graph image storage
+   - Both directories referenced in GUI but were missing from workspace
+
+5. Added Documentation for Raspberry Pi Server Integration
+   - Documented pi_tcp_server.py and pi_websocket_server.py features
+   - Added systemd service integration details
+   - Recorded Flutter app WebSocket updates from 02/04/26
+   - Ensured complete change history preservation
+
+
+Frequency Scanner Tool and Enhancements - 02/06/26
+==================================================
+
+1. Created find_quiet_frequencies.py - RF Noise Floor Scanner
+   - Scans frequency ranges to identify low-noise bands for RF transmission
+   - Uses ZNLE6 VNA + Pasco WA-9800A receiver to measure background RF noise
+   - Analyzes spectrum to find quiet (low-noise) frequency bands
+   - Identifies bands below configurable noise threshold
+   - Provides frequency recommendations for NanoVNA transmission experiments
+
+2. Frequency Scanner Features
+   - Dual frequency input modes: Center+Span or Start+Stop
+   - Configurable scan parameters: points, threshold, minimum bandwidth
+   - Automatic quiet band detection with configurable sensitivity
+   - Statistical analysis: mean, median, min, max, standard deviation
+   - Visual identification of quiet bands (highlighted in green on plots)
+   - CSV export option for raw frequency vs power data
+   - Comprehensive terminal output with recommendations
+
+3. Created frequency_scanner_gui.py - GUI for Frequency Scanner
+   - Graphical interface for find_quiet_frequencies.py
+   - Connection settings: IP address, port, receiver port selection
+   - Frequency mode toggle: Center+Span or Start+Stop
+   - Quick preset buttons: 900 MHz ±100 MHz, 2.4 GHz ±100 MHz, 5 GHz ±200 MHz
+   - Scan parameters: points, quiet threshold (dB), minimum bandwidth (MHz)
+   - Custom filename input for organized data storage
+   - Separate directory selectors for CSV and plot outputs
+   - Real-time scan output display with scrollable text area
+   - Help button with built-in documentation
+   - Start/Stop buttons with status feedback
+
+4. Desktop Integration
+   - Created Frequency_Scanner.desktop launcher
+   - Single-click access from desktop icon
+   - Saved in repository at scripts/Frequency_Scanner.desktop
+   - Configured with virtual environment Python interpreter
+   - Proper working directory and startup settings
+
+5. GitHub Connection and Repository Fixes
+   - Set up automatic GitHub authentication using GitHub CLI (gh)
+   - Configured git to use gh credentials with "gh auth setup-git"
+   - Fixed corrupted git repository objects
+   - Created recover_git_repo.sh script for future repository repairs
+   - Recovered from empty object file errors
+   - Repository now properly connected to github.com/lesmalan/Antenna_Aligner.git
+   - GitHub authentication persists across system reboots
+
+6. Monitor Mode Y-Axis Scaling Enhancement (znle_pyvisa.py)
+   - Updated time-series plots to use consistent y-axis scaling
+   - Y-axis now set to average ± 2.5 dB for all monitor mode measurements
+   - Calculates average amplitude across entire measurement duration
+   - Displays average and y-axis range in console output
+   - Enables direct visual comparison between different alignment runs
+   - Prevents auto-scaling from hiding small signal variations
+
+7. Output File Management Improvements
+   - Added --csv-dir, --plots-dir, --filename arguments to find_quiet_frequencies.py
+   - Fixed plot/CSV saving to respect user-specified directories
+   - Files now saved with custom base filename plus timestamp
+   - GUI properly passes directory and filename parameters to backend script
+   - Format: {filename}_{timestamp}.csv and {filename}_{timestamp}.png
+   - Directories automatically created if they don't exist
+
+8. Documentation and Change Tracking
+   - Created vscode_github_commands.txt with GitHub connection instructions
+   - Documented authentication setup for VS Code integration
+   - Recorded all changes in CHANGES.txt following established format conventions
+   - Preserved complete history of tools created and modifications made
+
+9. Enhanced Error Reporting (frequency_scanner_gui.py)
+   - Implemented comprehensive input validation with field-specific error messages
+   - Added stderr capture for subprocess error handling
+   - Categorized exceptions: FileNotFoundError, PermissionError, general exceptions
+   - Added full traceback logging to scan output display
+   - Provides examples of valid input formats in error messages
+   - Validates IP address, port numbers, frequency values, and scan parameters
+   - Shows specific field names and constraints when validation fails
+
+10. Bug Fix - Missing Import Statement (find_quiet_frequencies.py)
+   - Added missing "import os" at line 13
+   - Fixed NameError that prevented directory creation and file operations
+   - Required for os.path.join() and os.makedirs() function calls
+
+11. Plot Enhancement - Quietest Frequency Marker
+   - Added red star marker on plot to indicate quietest detected frequency
+   - Marker placed at minimum power point across entire spectrum
+   - Legend entry: "Quietest: {frequency} MHz at {power} dBm"
+   - Provides quick visual identification of optimal transmission frequency
+
+12. Non-Blocking Plot Display (find_quiet_frequencies.py)
+   - Removed plt.show() which was blocking script execution
+   - Script now completes immediately after scan finishes
+   - Replaced with plt.close() to free memory resources
+   - Added automatic plot opening using xdg-open subprocess
+   - Plot opens in default image viewer as separate non-blocking process
+   - GUI now shows "Scan complete!" message immediately
+   - Enables continuous scanning operations without manual window management
+   - Fixes issue where scan appeared frozen until matplotlib window was closed
+
+Usage - Frequency Scanner:
+   - Launch GUI: Double-click "Frequency Scanner" desktop icon
+   - Or from terminal: python3 scripts/frequency_scanner_gui.py
+   - Command line: python3 scripts/find_quiet_frequencies.py --center 900e6 --span 200e6
+   - Select frequency range (presets or custom)
+   - Configure scan parameters and output filename
+   - Click "Start Scan" to begin measurement
+   - View real-time progress and results
+   - Check Plots/ directory for visual analysis
+   - Use recommended frequency for NanoVNA transmission experiments
 
 Dependencies Added:
-   - matplotlib (installed via pip)
-   - time, datetime (Python standard library)
+   - numpy (for statistical analysis and array operations)
+   - subprocess (Python standard library, for automatic plot opening)
+   - All matplotlib and pyvisa dependencies already present from previous tools

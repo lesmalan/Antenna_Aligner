@@ -237,16 +237,16 @@ def main() -> None:
             plt.title(f"{args.param} Signal Monitoring (Avg: {avg_amplitude:.2f} dB)")
             plt.grid(True, alpha=0.3)
             
-            # Set fixed y-axis limits: average ± 2.5 dB
+            # Set fixed y-axis limits: average ± 5 dB
             # This prevents auto-scaling from hiding small signal variations
-            plt.ylim(avg_amplitude - 2.5, avg_amplitude + 2.5)
+            plt.ylim(avg_amplitude - 5, avg_amplitude + 5)
             
             plt.tight_layout()
             plt.savefig(plot_filename, dpi=150)
             plt.close()  # Free memory
             print(f"Saved plot to {plot_filename}")
             print(f"Average amplitude: {avg_amplitude:.2f} dB")
-            print(f"Y-axis range: [{avg_amplitude-2.5:.2f}, {avg_amplitude+2.5:.2f}] dB")
+            print(f"Y-axis range: [{avg_amplitude-5:.2f}, {avg_amplitude+5:.2f}] dB")
     # ==================================================================
     # FREQUENCY SWEEP MODE: Measure amplitude across frequency range
     # ==================================================================

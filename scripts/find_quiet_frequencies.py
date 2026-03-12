@@ -165,6 +165,8 @@ def main():
                     help="SCPI port (default: 5025)")
     ap.add_argument("--receiver-port", default=1, type=int, 
                     help="VNA receiver port: 1 or 2 (default: 1)")
+    ap.add_argument("--s-parameter", default="S22", type=str,
+                    help="S-parameter to measure: S11, S12, S21, or S22 (default: S22)")
     
     # Frequency range (two input modes: center/span or start/stop)
     ap.add_argument("--center", type=float, 
@@ -216,6 +218,7 @@ def main():
     print(f"Frequency range: {hz_to_str(start_freq)} to {hz_to_str(stop_freq)}")
     print(f"Sweep points: {args.points}")
     print(f"Receiver port: {args.receiver_port}")
+    print(f"S-Parameter: {args.s_parameter}")
     print(f"{'='*60}\n")
     
     # ===============================================================
@@ -229,11 +232,12 @@ def main():
     try:
         # Open TCP/IP socket connection to VNA
         inst = rm.open_resource(resource)
-        inst.timeout = 20000  # 20 second timeout for slow sweeps
+        inst.timeout = 60000  # 60 second timeout for slow sweeps with many points
         inst.write_termination = "\n"  # SCPI uses newline termination
         inst.read_termination = "\n"
         
         # Verify connection with instrument identification query
+        print("Querying instrument identification...")
         idn = inst.query("*IDN?")
         print(f"Connected: {idn.strip()}\n")
         
@@ -243,14 +247,21 @@ def main():
         
         print("Configuring VNA for spectrum scan...")
         
+        # Reset averaging to speed up measurement
+        inst.write("SENS:AVER OFF")
+        
         # Set data format to ASCII (comma-separated values)
         inst.write("FORM:DATA ASCii")
         
         # Configure measurement port and S-parameter
-        # S11: Reflection from port 1 (measures ambient RF entering receiver)
-        # S22: Reflection from port 2 (if using second receiver)
+        # S11: Reflection from port 1
+        # S12: Transmission from port 2 to port 1 (reverse transmission)
+        # S21: Transmission from port 1 to port 2 (forward transmission)
+        # S22: Reflection from port 2
         inst.write(f"CALC:PAR:PORT {args.receiver_port}")
-        inst.write(f"CALC:PAR:DEF 'Trc1',S{args.receiver_port}{args.receiver_port}")
+        
+        # Set the specified S-parameter
+        inst.write(f"CALC:PAR:DEF 'Trc1',{args.s_parameter}")
         inst.write("CALC:PAR:SEL 'Trc1'")
         
         # Set frequency sweep range
@@ -264,23 +275,24 @@ def main():
         # Disable continuous sweep (we'll trigger single sweep)
         inst.write("INIT:CONT OFF")
         
-        # Disable continuous sweep (we'll trigger single sweep)
-        inst.write("INIT:CONT OFF")
-        
         # ===============================================================
         # PERFORM FREQUENCY SWEEP
         # ===============================================================
         
-        print("Performing frequency sweep...")
+        print(f"Performing frequency sweep ({args.points} points)...")
+        print("This may take 30-60 seconds depending on VNA settings...")
         inst.write("INIT")  # Start single sweep
+        print("Waiting for sweep to complete...")
         inst.query("*OPC?")  # Wait for operation complete
+        print("Sweep complete!")
         
         # ===============================================================
         # RETRIEVE MEASUREMENT DATA
         # ===============================================================
         
-        print("Retrieving data...")
+        print("Retrieving data from VNA...")
         data_str = inst.query("CALC:DATA? FDATA")  # Get formatted data
+        print(f"Retrieved {len(data_str)} characters of data")
         
         # Parse CSV string into numpy array of power values
         power_dbm = np.array([float(x) for x in data_str.strip().split(",") if x.strip()])
