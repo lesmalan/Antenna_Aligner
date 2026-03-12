@@ -202,13 +202,14 @@ class _AlignmentPageState extends State<AlignmentPage> {
               }
 
               // Handle sweep data from Pi 5 (automatic mode - no CSV upload needed)
-              if (data.containsKey('sweep_active') && data['sweep_active'] == true) {
+              if (data.containsKey('sweep_active') &&
+                  data['sweep_active'] == true) {
                 final sweepType = data['sweep_type'] as String?;
                 if (data.containsKey('sweep_point')) {
                   final point = data['sweep_point'];
                   final degree = (point['degree'] as num).toDouble();
                   final amplitude = (point['amplitude'] as num).toDouble();
-                  
+
                   if (sweepType == 'azimuth') {
                     // Auto-start azimuth sweep if not already
                     if (_azimuthPhase != AzimuthPhase.sweepInProgress) {
@@ -242,7 +243,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
               }
 
               // Handle sweep completion from Pi 5
-              if (data.containsKey('sweep_status') && data['sweep_status'] == 'completed') {
+              if (data.containsKey('sweep_status') &&
+                  data['sweep_status'] == 'completed') {
                 final sweepType = data['sweep_type'] as String?;
                 // Process bulk sweep data if provided
                 if (data.containsKey('sweep_data')) {
@@ -282,7 +284,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   _azimuthPhase = AzimuthPhase.sweepComplete;
                   _azimuthDataLoaded = true;
                   _calculateAzimuthDegreesToMax();
-                } else if (sweepType == 'elevation' && _elevationSweepData.isNotEmpty) {
+                } else if (sweepType == 'elevation' &&
+                    _elevationSweepData.isNotEmpty) {
                   _elevationPhase = ElevationPhase.sweepComplete;
                   _elevationDataLoaded = true;
                   _calculateElevationDegreesToMax();
