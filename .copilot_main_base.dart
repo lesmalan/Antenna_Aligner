@@ -6,10 +6,10 @@ import 'dart:io';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:file_picker/file_picker.dart';
 
-/// Data point from sweep containing degree position and amplitude
+/// Data point from sweep containing degree position and amplitude (RSL)
 class SweepDataPoint {
   final double degree;
-  final double amplitude; // amplitude in dBm
+  final double amplitude; // RSL in dBm
 
   SweepDataPoint({required this.degree, required this.amplitude});
 
@@ -81,25 +81,24 @@ class _AlignmentPageState extends State<AlignmentPage> {
   // Azimuth sweep data collection
   AzimuthPhase _azimuthPhase = AzimuthPhase.waitingForConnection;
   final List<SweepDataPoint> _azimuthSweepData =
-      []; // Store all degree+amplitude readings during azimuth sweep
-  double _azimuthMaxSweepRSL = -100.0; // Peak amplitude during azimuth sweep
-  double _azimuthMaxSweepDegree = 0.0; // Degree position of peak amplitude
+      []; // Store all degree+RSL readings during azimuth sweep
+  double _azimuthMaxSweepRSL = -100.0; // Max RSL found during azimuth sweep
+  double _azimuthMaxSweepDegree = 0.0; // Degree position of max RSL
   double _azimuthCurrentDegree = 0.0; // Current azimuth degree position
   double _azimuthDegreesToMaxRSL =
-      0.0; // Calculated: degrees to rotate to reach peak amplitude
+      0.0; // Calculated: degrees to rotate to reach max RSL
   bool _isRecordingAzimuth = false; // Flag: continuously recording azimuth data
   bool _azimuthDataLoaded = false; // Flag: CSV data has been loaded
 
   // Elevation sweep data collection
   ElevationPhase _elevationPhase = ElevationPhase.waitingForStart;
   final List<SweepDataPoint> _elevationSweepData =
-      []; // Store all degree+amplitude readings during elevation sweep
-  double _elevationMaxSweepRSL =
-      -100.0; // Peak amplitude during elevation sweep
-  double _elevationMaxSweepDegree = 0.0; // Degree position of peak amplitude
+      []; // Store all degree+RSL readings during elevation sweep
+  double _elevationMaxSweepRSL = -100.0; // Max RSL found during elevation sweep
+  double _elevationMaxSweepDegree = 0.0; // Degree position of max RSL
   double _elevationCurrentDegree = 0.0; // Current elevation degree position
   double _elevationDegreesToMaxRSL =
-      0.0; // Calculated: degrees to rotate to reach peak amplitude
+      0.0; // Calculated: degrees to rotate to reach max RSL
   bool _isRecordingElevation =
       false; // Flag: continuously recording elevation data
   bool _elevationDataLoaded = false; // Flag: CSV data has been loaded
@@ -189,7 +188,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 _azimuthMaxSweepRSL = -100.0;
               }
 
-              // Update amplitude if provided
+              // Update RSL if provided
               if (data.containsKey('rsl')) {
                 _currentRSL = (data['rsl'] as num).toDouble();
               }
@@ -566,7 +565,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Loaded ${dataPoints.length} data points. Peak amplitude: ${maxAmplitude.toStringAsFixed(1)} dBm at ${maxDegree.toStringAsFixed(1)} deg',
+              'Loaded ${dataPoints.length} data points. Max RSL: ${maxAmplitude.toStringAsFixed(1)} dBm at ${maxDegree.toStringAsFixed(1)}┬░',
             ),
             backgroundColor: kThemeBurgundy,
           ),
@@ -585,7 +584,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
     }
   }
 
-  /// Calculate degrees to rotate to reach peak amplitude for azimuth
+  /// Calculate degrees to rotate to reach max RSL for azimuth
   void _calculateAzimuthDegreesToMax() {
     if (_azimuthSweepData.isEmpty) return;
 
@@ -605,7 +604,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
     }
   }
 
-  /// Calculate degrees to rotate to reach peak amplitude for elevation
+  /// Calculate degrees to rotate to reach max RSL for elevation
   void _calculateElevationDegreesToMax() {
     if (_elevationSweepData.isEmpty) return;
 
@@ -629,7 +628,56 @@ class _AlignmentPageState extends State<AlignmentPage> {
   Widget build(BuildContext context) {
     // Show connection screen if not yet connected
     if (!_isConnected) {
-      return _buildConnectionScreen();
+      return Scaffold(
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Theme.of(context).colorScheme.primary,
+                kThemeBurgundyDark,
+              ],
+            ),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 40),
+                const CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  strokeWidth: 3,
+                ),
+                const SizedBox(height: 32),
+                Text(
+                  'Connecting to Raspberry Pi',
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'IP: 192.168.15.192:8000',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: Colors.white70),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _connectionStatus,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white60,
+                    fontStyle: FontStyle.italic,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
     }
 
     // Show sweep phase screen
@@ -646,7 +694,77 @@ class _AlignmentPageState extends State<AlignmentPage> {
 
     // Show alignment screen (original flow)
     if (_processCompleted) {
-      return _buildFinalizedScreen();
+      return Scaffold(
+        body: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Theme.of(context).colorScheme.primary, kThemeBurgundy],
+            ),
+          ),
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.check_circle,
+                    size: 120,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(height: 32),
+                  Text(
+                    'Alignment Finalized!',
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Both Side 1 and Side 2 antennas have been successfully aligned.',
+                    style: Theme.of(
+                      context,
+                    ).textTheme.titleMedium?.copyWith(color: Colors.white),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 24),
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white54),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.link_off,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Disconnect from Side 2 antenna',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
     }
 
     return Scaffold(
@@ -731,236 +849,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
     );
   }
 
-  Widget _buildConnectionScreen() {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [kThemeNavyDark, kThemeNavy, kThemeBurgundyDark],
-            stops: [0.1, 0.55, 1.0],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 560),
-                child: Container(
-                  padding: const EdgeInsets.all(26),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(28),
-                    border: Border.all(color: Colors.white24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.18),
-                        blurRadius: 28,
-                        offset: const Offset(0, 12),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 74,
-                        height: 74,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: 0.15),
-                          border: Border.all(color: Colors.white30),
-                        ),
-                        child: const Icon(
-                          Icons.radar_rounded,
-                          color: Colors.white,
-                          size: 36,
-                        ),
-                      ),
-                      const SizedBox(height: 22),
-                      Text(
-                        'Connecting to Raspberry Pi',
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w700,
-                            ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Microwave Signal Alignment is waiting for live telemetry.',
-                        style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Colors.white70,
-                          height: 1.35,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 22),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: Colors.white24),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.router_rounded,
-                              color: Colors.white,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                'Endpoint: 192.168.15.192:8000',
-                                style: Theme.of(context).textTheme.bodyMedium
-                                    ?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      const CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                        strokeWidth: 3,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _connectionStatus,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white70,
-                          fontStyle: FontStyle.italic,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFinalizedScreen() {
-    return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [kThemeNavyDark, kThemeNavy, kThemeBurgundy],
-            stops: [0.0, 0.55, 1.0],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 620),
-                child: Container(
-                  padding: const EdgeInsets.all(28),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: Colors.white24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 32,
-                        offset: const Offset(0, 12),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 88,
-                        height: 88,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: 0.15),
-                          border: Border.all(color: Colors.white30),
-                        ),
-                        child: const Icon(
-                          Icons.task_alt_rounded,
-                          size: 46,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 22),
-                      Text(
-                        'Alignment Finalized',
-                        style: Theme.of(context).textTheme.headlineMedium
-                            ?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w800,
-                            ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        'Both Side 1 and Side 2 antennas have been aligned successfully.',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(color: Colors.white70, height: 1.3),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 22),
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: Colors.white24),
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.link_off_rounded,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                'Disconnect from Side 2 antenna',
-                                style: Theme.of(context).textTheme.titleSmall
-                                    ?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildAzimuthSweepScreen() {
     if (_azimuthPhase == AzimuthPhase.sweepInProgress) {
       return Scaffold(
@@ -977,56 +865,189 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                      child: SizedBox(
-                        height: 320,
-                        child: _buildIncomingSignalGraph(),
+                    // Side 1 complete indicator (only show when on side 2)
+                    if (_side1Complete)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        color: kThemeNavyLight,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              color: kThemeNavy,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Side 1 Complete',
+                              style: TextStyle(
+                                color: kThemeNavy,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    // Instructions
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      color: kThemeBurgundyLight,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.info,
+                            size: 40,
+                            color: kThemeBurgundy,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Azimuth Sweep in Progress - Side $_currentSide',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Rotate the antenna from left to right. Press "Start Recording" to begin capturing data.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: Colors.black54),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     ),
-                    _buildVnaDataPanel(
-                      title: 'Live Telemetry',
-                      subtitle:
-                          'Showing only the required incoming measurements for alignment.',
-                      metrics: [
-                        _buildVnaMetricTile(
-                          icon: Icons.download_rounded,
-                          label: 'Received Amplitude',
-                          value:
-                              '${(_azimuthSweepData.isNotEmpty ? _azimuthSweepData.last.amplitude : _currentRSL).toStringAsFixed(1)} dBm',
-                          accentColor: kThemeNavy,
-                          supportingText: 'Latest value from incoming data',
-                        ),
-                        _buildVnaMetricTile(
-                          icon: Icons.settings_ethernet_rounded,
-                          label: 'Motor Steps Taken',
-                          value: '${_azimuthSweepData.length}',
-                          accentColor: kThemeBurgundy,
-                          supportingText: 'Step count from received samples',
-                        ),
-                        _buildVnaMetricTile(
-                          icon: Icons.sensors_rounded,
-                          label: 'Current Amplitude',
-                          value: '${_currentRSL.toStringAsFixed(1)} dBm',
-                          accentColor: Theme.of(context).colorScheme.primary,
-                          supportingText: 'Live reading right now',
-                        ),
-                      ],
-                      actions: [
-                        ElevatedButton.icon(
-                          onPressed: _loadAzimuthCSV,
-                          icon: const Icon(Icons.upload_file),
-                          label: const Text('Load Alignment CSV'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: kThemeBurgundy,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
-                            ),
+                    // Real-time signal graph
+                    SizedBox(height: 250, child: _buildSignalGraphSection()),
+                    // Sweep data info
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      color: Colors.grey[100],
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Wrap(
+                            spacing: 24,
+                            runSpacing: 16,
+                            alignment: WrapAlignment.spaceEvenly,
+                            children: [
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Data Points',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: Colors.grey[600]),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${_azimuthSweepData.length}',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Max RSL Found',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: Colors.grey[600]),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${_azimuthMaxSweepRSL.toStringAsFixed(1)} dBm',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: kThemeBurgundy,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Current RSL',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: Colors.grey[600]),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${_currentRSL.toStringAsFixed(1)} dBm',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 20),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: _toggleAzimuthRecording,
+                                icon: Icon(
+                                  _isRecordingAzimuth
+                                      ? Icons.stop
+                                      : Icons.play_arrow,
+                                ),
+                                label: Text(
+                                  _isRecordingAzimuth
+                                      ? 'Stop Recording'
+                                      : 'Start Recording',
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _isRecordingAzimuth
+                                      ? Colors.red[600]
+                                      : Theme.of(context).colorScheme.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 12,
+                                  ),
+                                ),
+                              ),
+                              ElevatedButton.icon(
+                                onPressed: _completeSweep,
+                                icon: const Icon(Icons.check),
+                                label: const Text('Sweep Complete'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: kThemeBurgundy,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -1037,6 +1058,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
       );
     }
 
+    // Sweep complete - show degree analysis and load CSV option
     if (_azimuthPhase == AzimuthPhase.sweepComplete) {
       return Scaffold(
         appBar: AppBar(
@@ -1053,19 +1075,196 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (!_azimuthDataLoaded)
-                        _buildCsvRequiredCard(
-                          axisName: 'Azimuth',
-                          onLoad: _loadAzimuthCSV,
-                        )
-                      else
-                        _buildAlignmentPromptCard(
-                          axisName: 'Azimuth',
-                          targetDegree: _azimuthMaxSweepDegree,
-                          degreesToMove: _azimuthDegreesToMaxRSL,
-                          peakAmplitude: _azimuthMaxSweepRSL,
-                          onConfirm: _confirmAzimuthAlignment,
+                      // Sweep results
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: kThemeNavyLight,
+                          border: Border.all(color: kThemeNavy),
+                          borderRadius: BorderRadius.circular(12),
                         ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: kThemeBurgundy,
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _azimuthDataLoaded
+                                      ? 'CSV Data Loaded'
+                                      : 'Sweep Complete',
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: kThemeNavy,
+                                      ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Sweep Results:',
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Data points collected: ${_azimuthSweepData.length}',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Maximum RSL: ${_azimuthMaxSweepRSL.toStringAsFixed(1)} dBm at ${_azimuthMaxSweepDegree.toStringAsFixed(1)}┬░',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: kThemeBurgundy,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      // Data status and optional CSV fallback
+                      if (!_azimuthDataLoaded) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: kThemeNavyLight,
+                            border: Border.all(color: kThemeNavy),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.wifi, color: kThemeNavy),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Sweep data will be received automatically from Pi 5 when you run the motor control script.',
+                                  style: const TextStyle(color: kThemeNavyDark),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Or load from CSV file (optional):',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: Colors.grey[600]),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _loadAzimuthCSV,
+                            icon: const Icon(Icons.upload_file),
+                            label: const Text('Load Azimuth CSV'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.grey[700],
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                      // Show alignment instructions when data is loaded
+                      if (_azimuthDataLoaded) ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: kThemeBurgundyLight,
+                            border: Border.all(color: kThemeBurgundy),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Alignment Instructions:',
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Maximum signal at: ${_azimuthMaxSweepDegree.toStringAsFixed(1)}┬░',
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(
+                                      color: kThemeBurgundy,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Current position: ${_azimuthCurrentDegree.toStringAsFixed(1)}┬░',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: kThemeNavyLight,
+                                  border: Border.all(color: kThemeNavy),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: RichText(
+                                  text: TextSpan(
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
+                                    children: [
+                                      TextSpan(
+                                        text: _azimuthDegreesToMaxRSL < 0
+                                            ? 'Rotate LEFT '
+                                            : 'Rotate RIGHT ',
+                                      ),
+                                      TextSpan(
+                                        text:
+                                            '${_azimuthDegreesToMaxRSL.abs().toStringAsFixed(1)}┬░',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: kThemeBurgundy,
+                                          fontSize: 18,
+                                        ),
+                                      ),
+                                      const TextSpan(
+                                        text: ' to reach the maximum signal.',
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _confirmAzimuthAlignment,
+                            icon: const Icon(Icons.done),
+                            label: const Text('Confirm Alignment'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1095,56 +1294,189 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                      child: SizedBox(
-                        height: 320,
-                        child: _buildIncomingSignalGraph(),
+                    // Side 1 complete indicator (only show when on side 2)
+                    if (_side1Complete)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        color: kThemeNavyLight,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.check_circle,
+                              color: kThemeNavy,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Side 1 Complete',
+                              style: TextStyle(
+                                color: kThemeNavy,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    // Instructions
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      color: kThemeBurgundyLight,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(
+                            Icons.info,
+                            size: 40,
+                            color: kThemeBurgundy,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            'Elevation Sweep in Progress - Side $_currentSide',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Rotate the antenna from bottom to top. Press "Start Recording" to begin capturing data.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(color: Colors.black54),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ),
                     ),
-                    _buildVnaDataPanel(
-                      title: 'Live Telemetry',
-                      subtitle:
-                          'Showing only the required incoming measurements for alignment.',
-                      metrics: [
-                        _buildVnaMetricTile(
-                          icon: Icons.download_rounded,
-                          label: 'Received Amplitude',
-                          value:
-                              '${(_elevationSweepData.isNotEmpty ? _elevationSweepData.last.amplitude : _currentRSL).toStringAsFixed(1)} dBm',
-                          accentColor: kThemeNavy,
-                          supportingText: 'Latest value from incoming data',
-                        ),
-                        _buildVnaMetricTile(
-                          icon: Icons.settings_ethernet_rounded,
-                          label: 'Motor Steps Taken',
-                          value: '${_elevationSweepData.length}',
-                          accentColor: kThemeBurgundy,
-                          supportingText: 'Step count from received samples',
-                        ),
-                        _buildVnaMetricTile(
-                          icon: Icons.sensors_rounded,
-                          label: 'Current Amplitude',
-                          value: '${_currentRSL.toStringAsFixed(1)} dBm',
-                          accentColor: Theme.of(context).colorScheme.primary,
-                          supportingText: 'Live reading right now',
-                        ),
-                      ],
-                      actions: [
-                        ElevatedButton.icon(
-                          onPressed: _loadElevationCSV,
-                          icon: const Icon(Icons.upload_file),
-                          label: const Text('Load Alignment CSV'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: kThemeBurgundy,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 24,
-                              vertical: 12,
-                            ),
+                    // Real-time signal graph
+                    SizedBox(height: 250, child: _buildSignalGraphSection()),
+                    // Sweep data info
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      color: Colors.grey[100],
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Wrap(
+                            spacing: 24,
+                            runSpacing: 16,
+                            alignment: WrapAlignment.spaceEvenly,
+                            children: [
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Data Points',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: Colors.grey[600]),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${_elevationSweepData.length}',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Max RSL Found',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: Colors.grey[600]),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${_elevationMaxSweepRSL.toStringAsFixed(1)} dBm',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: kThemeBurgundy,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'Current RSL',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(color: Colors.grey[600]),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${_currentRSL.toStringAsFixed(1)} dBm',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 20),
+                          Wrap(
+                            spacing: 12,
+                            runSpacing: 12,
+                            alignment: WrapAlignment.center,
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: _toggleElevationRecording,
+                                icon: Icon(
+                                  _isRecordingElevation
+                                      ? Icons.stop
+                                      : Icons.play_arrow,
+                                ),
+                                label: Text(
+                                  _isRecordingElevation
+                                      ? 'Stop Recording'
+                                      : 'Start Recording',
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: _isRecordingElevation
+                                      ? Colors.red[600]
+                                      : Theme.of(context).colorScheme.primary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 12,
+                                  ),
+                                ),
+                              ),
+                              ElevatedButton.icon(
+                                onPressed: _completeElevationSweep,
+                                icon: const Icon(Icons.check),
+                                label: const Text('Sweep Complete'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: kThemeBurgundy,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 24,
+                                    vertical: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
@@ -1155,6 +1487,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
       );
     }
 
+    // Elevation sweep complete - ask for number of turnbuckles
     if (_elevationPhase == ElevationPhase.sweepComplete) {
       return Scaffold(
         appBar: AppBar(
@@ -1171,20 +1504,196 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (!_elevationDataLoaded)
-                        _buildCsvRequiredCard(
-                          axisName: 'Elevation',
-                          onLoad: _loadElevationCSV,
-                        )
-                      else
-                        _buildAlignmentPromptCard(
-                          axisName: 'Elevation',
-                          targetDegree: _elevationMaxSweepDegree,
-                          degreesToMove: _elevationDegreesToMaxRSL,
-                          peakAmplitude: _elevationMaxSweepRSL,
-                          onConfirm: _confirmElevationAlignment,
-                          isVertical: true,
+                      // Sweep results
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: kThemeNavyLight,
+                          border: Border.all(color: kThemeNavy),
+                          borderRadius: BorderRadius.circular(12),
                         ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.check_circle,
+                                  color: kThemeBurgundy,
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _elevationDataLoaded
+                                      ? 'CSV Data Loaded'
+                                      : 'Sweep Complete',
+                                  style: Theme.of(context).textTheme.titleMedium
+                                      ?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: kThemeNavy,
+                                      ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Sweep Results:',
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Data points collected: ${_elevationSweepData.length}',
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Maximum RSL: ${_elevationMaxSweepRSL.toStringAsFixed(1)} dBm at ${_elevationMaxSweepDegree.toStringAsFixed(1)}┬░',
+                              style: Theme.of(context).textTheme.bodyMedium
+                                  ?.copyWith(
+                                    color: kThemeBurgundy,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      // Data status and optional CSV fallback
+                      if (!_elevationDataLoaded) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: kThemeNavyLight,
+                            border: Border.all(color: kThemeNavy),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.wifi, color: kThemeNavy),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  'Sweep data will be received automatically from Pi 5 when you run the motor control script.',
+                                  style: const TextStyle(color: kThemeNavyDark),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Or load from CSV file (optional):',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: Colors.grey[600]),
+                        ),
+                        const SizedBox(height: 8),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: _loadElevationCSV,
+                            icon: const Icon(Icons.upload_file),
+                            label: const Text('Load Elevation CSV'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.grey[700],
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                      ],
+                      // Show alignment instructions when data is loaded
+                      if (_elevationDataLoaded) ...[
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: kThemeBurgundyLight,
+                            border: Border.all(color: kThemeBurgundy),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Alignment Instructions:',
+                                style: Theme.of(context).textTheme.titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Maximum signal at: ${_elevationMaxSweepDegree.toStringAsFixed(1)}┬░',
+                                style: Theme.of(context).textTheme.bodyMedium
+                                    ?.copyWith(
+                                      color: kThemeBurgundy,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Current position: ${_elevationCurrentDegree.toStringAsFixed(1)}┬░',
+                                style: Theme.of(context).textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: kThemeNavyLight,
+                                  border: Border.all(color: kThemeNavy),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: RichText(
+                                  text: TextSpan(
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodyMedium,
+                                    children: [
+                                      TextSpan(
+                                        text: _elevationDegreesToMaxRSL < 0
+                                            ? 'Rotate DOWN '
+                                            : 'Rotate UP ',
+                                      ),
+                                      TextSpan(
+                                        text:
+                                            '${_elevationDegreesToMaxRSL.abs().toStringAsFixed(1)}┬░',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: kThemeBurgundy,
+                                          fontSize: 18,
+                                        ),
+                                      ),
+                                      const TextSpan(
+                                        text: ' to reach the maximum signal.',
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _confirmElevationAlignment,
+                            icon: const Icon(Icons.done),
+                            label: const Text('Confirm Alignment'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 32,
+                                vertical: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -1198,406 +1707,81 @@ class _AlignmentPageState extends State<AlignmentPage> {
     return const SizedBox.shrink();
   }
 
-  Widget _buildIncomingSignalGraph() {
+  Widget _buildSignalGraphSection() {
     return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: kThemeNavy.withValues(alpha: 0.12)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Incoming Signal Graph',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: kThemeNavyDark,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Expanded(
-            child: CustomPaint(
-              painter: SineWavePainter(
-                currentRSL: _currentRSL,
-                maxRSL: _maxRSL,
-              ),
-              size: Size.infinite,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCsvRequiredCard({
-    required String axisName,
-    required VoidCallback onLoad,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: kThemeNavyLight,
-        border: Border.all(color: kThemeNavy),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$axisName Alignment Data Required',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: kThemeNavyDark,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Run the external program to generate the CSV file, then load it to receive the motor movement instruction.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: kThemeNavyDark,
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: onLoad,
-            icon: const Icon(Icons.upload_file),
-            label: Text('Load $axisName CSV'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kThemeBurgundy,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAlignmentPromptCard({
-    required String axisName,
-    required double targetDegree,
-    required double degreesToMove,
-    required double peakAmplitude,
-    required VoidCallback onConfirm,
-    bool isVertical = false,
-  }) {
-    final direction = degreesToMove < 0
-        ? (isVertical ? 'DOWN' : 'LEFT')
-        : (isVertical ? 'UP' : 'RIGHT');
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: kThemeBurgundyLight,
-        border: Border.all(color: kThemeBurgundy),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$axisName Alignment Prompt',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: kThemeBurgundyDark,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Move the stepper motor $direction ${degreesToMove.abs().toStringAsFixed(1)} deg to reach the peak amplitude.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: kThemeBurgundyDark,
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Peak amplitude: ${peakAmplitude.toStringAsFixed(1)} dBm at ${targetDegree.toStringAsFixed(1)} deg',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: Colors.black87),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: onConfirm,
-              icon: const Icon(Icons.done),
-              label: const Text('Confirm Alignment'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: kThemeBurgundy,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSweepBanner({
-    required IconData icon,
-    required String title,
-    required String message,
-    required Color accentColor,
-    required Color backgroundColor,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [backgroundColor, Colors.white],
-          ),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: accentColor.withValues(alpha: 0.18)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: accentColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, color: accentColor),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    message,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.black54,
-                      height: 1.35,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildVnaMetricTile({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color accentColor,
-    String? supportingText,
-  }) {
-    return Container(
-      constraints: const BoxConstraints(minWidth: 150, maxWidth: 220),
       padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: accentColor.withValues(alpha: 0.12)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
+      color: Colors.grey[50],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: accentColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, size: 18, color: accentColor),
-          ),
-          const SizedBox(height: 14),
+          // Title
           Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: Colors.grey[600],
-              letterSpacing: 0.2,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value,
+            'Signal Strength (RSL)',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.bold,
               color: Colors.black87,
             ),
           ),
-          if (supportingText != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              supportingText,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
+          const SizedBox(height: 8),
 
-  Widget _buildVnaDataPanel({
-    required String title,
-    required String subtitle,
-    required List<Widget> metrics,
-    required List<Widget> actions,
-  }) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FB),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: kThemeNavy.withValues(alpha: 0.08)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: kThemeNavyDark,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
-          ),
-          const SizedBox(height: 18),
-          Wrap(spacing: 14, runSpacing: 14, children: metrics),
-          const SizedBox(height: 18),
-          if (actions.isNotEmpty)
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              alignment: WrapAlignment.center,
-              children: actions,
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSignalGraphSection() {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Colors.white, kThemeNavyLight.withValues(alpha: 0.55)],
-        ),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: kThemeNavy.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Live VNA Signal',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: kThemeNavyDark,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            'Track amplitude in real time while the antenna moves.',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
-          ),
-          const SizedBox(height: 14),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
+          // Current RSL Value
+          Row(
             children: [
-              _buildVnaMetricTile(
-                icon: Icons.graphic_eq_rounded,
-                label: 'Current Amplitude',
-                value: '${_currentRSL.toStringAsFixed(1)} dBm',
-                accentColor: Theme.of(context).colorScheme.primary,
-                supportingText: 'Live receiver reading',
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Current: $_currentRSL dBm',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
               ),
-              _buildVnaMetricTile(
-                icon: Icons.flag_rounded,
-                label: 'Reference Peak',
-                value: '${_maxRSL.toStringAsFixed(1)} dBm',
-                accentColor: kThemeBurgundy,
-                supportingText: 'Target peak for comparison',
+              const SizedBox(width: 16),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 6,
+                ),
+                decoration: BoxDecoration(
+                  color: kThemeBurgundy,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Max: $_maxRSL dBm',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
+
+          // This should display a real-time graph of signal strength over time
           Expanded(
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
                 border: Border.all(color: Colors.grey[300]!),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
+                borderRadius: BorderRadius.circular(12),
               ),
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
+                  // Sine wave signal visualization
                   Expanded(
                     child: CustomPaint(
                       painter: SineWavePainter(
@@ -1607,9 +1791,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       size: Size.infinite,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   Text(
-                    'Real-time signal graph',
+                    'Real-time Signal Graph',
                     style: Theme.of(
                       context,
                     ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
@@ -1694,67 +1878,48 @@ class _AlignmentPageState extends State<AlignmentPage> {
             children: [
               Text(
                 title,
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
               const SizedBox(height: 4),
-              Text(
-                isConfirmed ? 'Aligned' : 'In Progress',
-                style: TextStyle(
-                  color: isConfirmed ? kThemeBurgundy : Colors.orange[700],
-                  fontWeight: FontWeight.w500,
+              RichText(
+                text: TextSpan(
+                  style: Theme.of(context).textTheme.bodySmall,
+                  children: [
+                    if (degreesLeft > 0)
+                      TextSpan(
+                        text: 'Rotate LEFT ${degreesLeft.toStringAsFixed(1)}┬░',
+                        style: const TextStyle(
+                          color: kThemeBurgundy,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    else if (degreesRight > 0)
+                      TextSpan(
+                        text:
+                            'Rotate RIGHT ${degreesRight.toStringAsFixed(1)}┬░',
+                        style: const TextStyle(
+                          color: kThemeBurgundy,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      )
+                    else
+                      const TextSpan(
+                        text: 'Aligned Γ£ô',
+                        style: TextStyle(
+                          color: kThemeBurgundy,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],
           ),
-          Row(
-            children: [
-              _buildDegreeIndicator(
-                label: title == 'Azimuth' ? 'L' : 'D',
-                value: degreesLeft,
-                color: kThemeNavy,
-              ),
-              const SizedBox(width: 12),
-              _buildDegreeIndicator(
-                label: title == 'Azimuth' ? 'R' : 'U',
-                value: degreesRight,
-                color: kThemeBurgundy,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDegreeIndicator({
-    required String label,
-    required double value,
-    required Color color,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.18)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: TextStyle(color: color, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            value > 0 ? '${value.toStringAsFixed(1)} deg' : '--',
-            style: const TextStyle(
-              color: Colors.black87,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          if (isConfirmed)
+            const Icon(Icons.check_circle, color: kThemeBurgundy, size: 32),
         ],
       ),
     );
@@ -1865,7 +2030,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _showConfirmationDialog(
         title: 'Azimuth Aligned',
         message:
-            'Azimuth alignment complete. Target position: ${_azimuthMaxSweepDegree.toStringAsFixed(1)} deg\n\nProceeding to elevation alignment...',
+            'Azimuth alignment complete. Target position: ${_azimuthMaxSweepDegree.toStringAsFixed(1)}┬░\n\nProceeding to elevation alignment...',
         onConfirm: () {
           Navigator.pop(context);
           // Start elevation sweep after azimuth is confirmed
@@ -1897,7 +2062,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           title: 'Side 1 Alignment Complete',
           message:
               'Side 1 azimuth and elevation alignment is complete.\n\n'
-              'Target elevation: ${_elevationMaxSweepDegree.toStringAsFixed(1)} deg (rotate ${_elevationDegreesToMaxRSL.abs().toStringAsFixed(1)} deg ${_elevationDegreesToMaxRSL < 0 ? "DOWN" : "UP"}).',
+              'Target elevation: ${_elevationMaxSweepDegree.toStringAsFixed(1)}┬░ (rotate ${_elevationDegreesToMaxRSL.abs().toStringAsFixed(1)}┬░ ${_elevationDegreesToMaxRSL < 0 ? "DOWN" : "UP"}).',
           disconnectMessage: 'Please DISCONNECT from Side 1 antenna now.',
           nextAction:
               'Connect to Side 2 antenna and tap "Continue" to proceed.',
@@ -1924,7 +2089,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           title: 'Alignment Finalized',
           message:
               'Side 2 azimuth and elevation alignment is complete.\n\n'
-              'Target elevation: ${_elevationMaxSweepDegree.toStringAsFixed(1)}° (rotate ${_elevationDegreesToMaxRSL.abs().toStringAsFixed(1)}° ${_elevationDegreesToMaxRSL < 0 ? "DOWN" : "UP"}).',
+              'Target elevation: ${_elevationMaxSweepDegree.toStringAsFixed(1)}┬░ (rotate ${_elevationDegreesToMaxRSL.abs().toStringAsFixed(1)}┬░ ${_elevationDegreesToMaxRSL < 0 ? "DOWN" : "UP"}).',
           disconnectMessage: 'Please DISCONNECT from Side 2 antenna now.',
           nextAction: 'Both antennas are now fully aligned!',
           showStartNewAlignment: false,
@@ -2192,7 +2357,7 @@ class SineWavePainter extends CustomPainter {
       canvas.drawLine(Offset(0, i), Offset(size.width, i), gridPaint);
     }
 
-    // Draw peak amplitude line
+    // Draw max RSL line
     final maxY = size.height * 0.1;
     canvas.drawLine(
       Offset(0, maxY),
@@ -2203,13 +2368,13 @@ class SineWavePainter extends CustomPainter {
         ..style = PaintingStyle.stroke,
     );
 
-    // Draw current amplitude level line
+    // Draw current RSL level line
     final rslRange = maxRSL - (-100.0);
     final currentRSLNormalized = (maxRSL - currentRSL) / rslRange;
     final currentY =
         size.height * 0.1 + (currentRSLNormalized * (size.height * 0.8));
 
-    // Draw dashed line for current amplitude
+    // Draw dashed line for current RSL
     final dashPaint = Paint()
       ..color = Colors.red[600]!
       ..strokeWidth = 2.5
@@ -2239,7 +2404,7 @@ class SineWavePainter extends CustomPainter {
       // Wave amplitude decreases as signal improves (more stable signal = flatter line)
       final amplitude = baseAmplitude * (rslFactor * 0.7 + 0.1);
 
-      // Oscillate around the current amplitude line
+      // Oscillate around the current RSL line
       final baseWave = amplitude * sin(x * frequency);
       final y = currentY + baseWave;
 
@@ -2265,7 +2430,7 @@ class SineWavePainter extends CustomPainter {
     const legendY = 8.0;
     const legendItemHeight = 16.0;
 
-    // Green line legend (Peak amplitude)
+    // Green line legend (Max RSL)
     canvas.drawLine(
       const Offset(legendX, legendY),
       const Offset(legendX + 10, legendY),
@@ -2275,7 +2440,7 @@ class SineWavePainter extends CustomPainter {
     );
     final maxLabel = TextPainter(
       text: TextSpan(
-        text: 'Peak: ${maxRSL.toStringAsFixed(1)} dBm',
+        text: 'Max: ${maxRSL.toStringAsFixed(1)} dBm',
         style: const TextStyle(
           color: Colors.black87,
           fontSize: 10,
@@ -2287,7 +2452,7 @@ class SineWavePainter extends CustomPainter {
     maxLabel.layout();
     maxLabel.paint(canvas, const Offset(legendX + 14, legendY - 6));
 
-    // Red dashed line legend (Current amplitude)
+    // Red dashed line legend (Current RSL)
     final dashedLinePaint = Paint()
       ..color = Colors.red[600]!
       ..strokeWidth = 2;
@@ -2308,7 +2473,7 @@ class SineWavePainter extends CustomPainter {
     }
     final currentLabel = TextPainter(
       text: TextSpan(
-        text: 'Current Amp: ${currentRSL.toStringAsFixed(1)} dBm',
+        text: 'Current: ${currentRSL.toStringAsFixed(1)} dBm',
         style: const TextStyle(
           color: Colors.black87,
           fontSize: 10,
