@@ -242,6 +242,22 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 }
               }
 
+              // Handle sweep start acknowledgment from Pi 5
+              if (data.containsKey('sweep_status') &&
+                  data['sweep_status'] == 'started') {
+                final sweepType = data['sweep_type'] as String?;
+                if (sweepType == 'azimuth') {
+                  _azimuthPhase = AzimuthPhase.sweepInProgress;
+                  _azimuthSweepData.clear();
+                  _azimuthMaxSweepRSL = -100.0;
+                } else if (sweepType == 'elevation') {
+                  _elevationPhase = ElevationPhase.sweepInProgress;
+                  _elevationSweepData.clear();
+                  _elevationMaxSweepRSL = -100.0;
+                }
+                debugPrint('Pi 5 acknowledged $sweepType sweep start');
+              }
+
               // Handle sweep completion from Pi 5
               if (data.containsKey('sweep_status') &&
                   data['sweep_status'] == 'completed') {
@@ -384,6 +400,28 @@ class _AlignmentPageState extends State<AlignmentPage> {
   void dispose() {
     _channel?.sink.close();
     super.dispose();
+  }
+
+  /// Send command to Pi 5 to start a sweep
+  void _sendStartSweep(String sweepType) {
+    if (_isConnected && _channel != null) {
+      _channel!.sink.add(
+        jsonEncode({'cmd': 'START_SWEEP', 'sweep_type': sweepType}),
+      );
+      debugPrint('Sent START_SWEEP command for $sweepType');
+    } else {
+      debugPrint('Cannot send START_SWEEP - not connected');
+    }
+  }
+
+  /// Send command to Pi 5 to stop the current sweep
+  void _sendStopSweep() {
+    if (_isConnected && _channel != null) {
+      _channel!.sink.add(jsonEncode({'cmd': 'STOP_SWEEP'}));
+      debugPrint('Sent STOP_SWEEP command');
+    } else {
+      debugPrint('Cannot send STOP_SWEEP - not connected');
+    }
   }
 
   /// Load azimuth sweep data from CSV file
@@ -2205,9 +2243,35 @@ class _AlignmentPageState extends State<AlignmentPage> {
         _seedElevationDemoData();
       }
     });
+    // Send command to Pi 5 to start elevation sweep (unless in debug mode)
+    if (!_overrideMode) {
+      _sendStartSweep('elevation');
+    }
+  }
+
+  /// Start azimuth sweep - called on connection or when manually restarting
+  void _startAzimuthSweep() {
+    setState(() {
+      _azimuthPhase = AzimuthPhase.sweepInProgress;
+      _azimuthSweepData.clear();
+      _azimuthMaxSweepRSL = -100.0;
+      _azimuthDataLoaded = false;
+      // Seed demo data when in debug mode
+      if (_overrideMode) {
+        _seedAzimuthDemoData();
+      }
+    });
+    // Send command to Pi 5 to start azimuth sweep (unless in debug mode)
+    if (!_overrideMode) {
+      _sendStartSweep('azimuth');
+    }
   }
 
   void _completeSweep() {
+    // Send command to Pi 5 to stop the sweep and get final data
+    if (!_overrideMode) {
+      _sendStopSweep();
+    }
     setState(() {
       _azimuthPhase = AzimuthPhase.sweepComplete;
     });
@@ -2272,6 +2336,10 @@ class _AlignmentPageState extends State<AlignmentPage> {
   }
 
   void _completeElevationSweep() {
+    // Send command to Pi 5 to stop the sweep and get final data
+    if (!_overrideMode) {
+      _sendStopSweep();
+    }
     setState(() {
       _elevationPhase = ElevationPhase.sweepComplete;
     });
