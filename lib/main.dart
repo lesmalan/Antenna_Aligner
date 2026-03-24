@@ -22,6 +22,13 @@ void main() {
   runApp(const MyApp());
 }
 
+const kThemeNavy = Color(0xFF15324A);
+const kThemeNavyDark = Color(0xFF0B1E2D);
+const kThemeNavyLight = Color(0xFFE8EEF4);
+const kThemeBurgundy = Color(0xFF7A1E3A);
+const kThemeBurgundyDark = Color(0xFF5A132B);
+const kThemeBurgundyLight = Color(0xFFF4E6EB);
+
 enum AlignmentStep { azimuth, elevation, finalized }
 
 enum AzimuthPhase {
@@ -33,14 +40,6 @@ enum AzimuthPhase {
 
 enum ElevationPhase { waitingForStart, sweepInProgress, sweepComplete, aligned }
 
-enum OverrideView {
-  connection,
-  azimuthSweep,
-  elevationSweep,
-  alignment,
-  completed,
-}
-
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -50,10 +49,15 @@ class MyApp extends StatelessWidget {
       title: 'Microwave Signal Alignment',
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF1B5E20), // Dark green
-          brightness: Brightness.light,
-        ).copyWith(secondary: const Color(0xFFFF8F00)), // Deep amber
+        colorScheme:
+            ColorScheme.fromSeed(
+              seedColor: kThemeNavy,
+              brightness: Brightness.light,
+            ).copyWith(
+              primary: kThemeNavy,
+              secondary: kThemeBurgundy,
+              tertiary: kThemeBurgundy,
+            ),
         appBarTheme: const AppBarTheme(centerTitle: true, elevation: 0),
       ),
       home: const AlignmentPage(),
@@ -114,8 +118,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
   bool _side1Complete = false; // Track if side 1 alignment is done
   bool _processCompleted = false; // true when the entire process is finalized
 
-  bool _overrideMode = false;
-  OverrideView _overrideView = OverrideView.connection;
   bool _isConnecting = false;
 
   @override
@@ -565,7 +567,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
             content: Text(
               'Loaded ${dataPoints.length} data points. Max RSL: ${maxAmplitude.toStringAsFixed(1)} dBm at ${maxDegree.toStringAsFixed(1)}°',
             ),
-            backgroundColor: Colors.green,
+            backgroundColor: kThemeBurgundy,
           ),
         );
       }
@@ -622,257 +624,11 @@ class _AlignmentPageState extends State<AlignmentPage> {
     }
   }
 
-  void _setOverrideView(OverrideView view) {
-    setState(() {
-      _overrideMode = true;
-      _overrideView = view;
-      _currentRSL = -85.0;
-
-      switch (view) {
-        case OverrideView.connection:
-          _azimuthPhase = AzimuthPhase.waitingForConnection;
-          _elevationPhase = ElevationPhase.waitingForStart;
-          _processCompleted = false;
-          _currentStep = AlignmentStep.azimuth;
-          break;
-        case OverrideView.azimuthSweep:
-          _azimuthPhase = AzimuthPhase.sweepInProgress;
-          _elevationPhase = ElevationPhase.waitingForStart;
-          _processCompleted = false;
-          _currentStep = AlignmentStep.azimuth;
-          _seedAzimuthDemoData();
-          break;
-        case OverrideView.elevationSweep:
-          _azimuthPhase = AzimuthPhase.aligned;
-          _elevationPhase = ElevationPhase.sweepInProgress;
-          _processCompleted = false;
-          _currentStep = AlignmentStep.elevation;
-          _seedElevationDemoData();
-          break;
-        case OverrideView.alignment:
-          _azimuthPhase = AzimuthPhase.aligned;
-          _elevationPhase = ElevationPhase.waitingForStart;
-          _azimuthConfirmed = true;
-          _elevationConfirmed = false;
-          _processCompleted = false;
-          _currentStep = AlignmentStep.elevation;
-          _seedAzimuthDemoData();
-          break;
-        case OverrideView.completed:
-          _azimuthPhase = AzimuthPhase.aligned;
-          _elevationPhase = ElevationPhase.aligned;
-          _processCompleted = true;
-          _currentStep = AlignmentStep.finalized;
-          break;
-      }
-    });
-  }
-
-  void _seedAzimuthDemoData() {
-    _azimuthSweepData
-      ..clear()
-      ..addAll([
-        SweepDataPoint(degree: -40, amplitude: -95.0),
-        SweepDataPoint(degree: -30, amplitude: -92.0),
-        SweepDataPoint(degree: -20, amplitude: -90.5),
-        SweepDataPoint(degree: -10, amplitude: -88.0),
-        SweepDataPoint(degree: 0, amplitude: -86.0),
-        SweepDataPoint(degree: 10, amplitude: -84.0),
-        SweepDataPoint(degree: 20, amplitude: -83.0), // Max RSL at 20°
-        SweepDataPoint(degree: 30, amplitude: -84.5),
-      ]);
-    _azimuthMaxSweepRSL = -83.0;
-    _azimuthMaxSweepDegree = 20.0;
-    _azimuthCurrentDegree = 30.0; // Currently at end of sweep
-    _azimuthDegreesToMaxRSL = -10.0; // Need to go back 10° left
-    _azimuthDegreesLeft = 10.0;
-    _azimuthDegreesRight = 0.0;
-    _azimuthDataLoaded = true;
-  }
-
-  void _seedElevationDemoData() {
-    _elevationSweepData
-      ..clear()
-      ..addAll([
-        SweepDataPoint(degree: -20, amplitude: -96.0),
-        SweepDataPoint(degree: -15, amplitude: -94.0),
-        SweepDataPoint(degree: -10, amplitude: -91.0),
-        SweepDataPoint(degree: -5, amplitude: -89.5),
-        SweepDataPoint(degree: 0, amplitude: -87.0),
-        SweepDataPoint(degree: 5, amplitude: -85.0),
-        SweepDataPoint(degree: 10, amplitude: -83.5), // Max RSL at 10°
-        SweepDataPoint(degree: 15, amplitude: -84.0),
-      ]);
-    _elevationMaxSweepRSL = -83.5;
-    _elevationMaxSweepDegree = 10.0;
-    _elevationCurrentDegree = 15.0; // Currently at end of sweep
-    _elevationDegreesToMaxRSL = -5.0; // Need to go down 5°
-    _elevationDegreesDown = 5.0;
-    _elevationDegreesUp = 0.0;
-    _elevationDataLoaded = true;
-  }
-
-  void _disableOverride() {
-    setState(() {
-      _overrideMode = false;
-      _overrideView = OverrideView.connection;
-    });
-  }
-
-  List<OverrideView> get _overrideOrder => const [
-    OverrideView.connection,
-    OverrideView.azimuthSweep,
-    OverrideView.elevationSweep,
-    OverrideView.alignment,
-    OverrideView.completed,
-  ];
-
-  void _goToNextOverrideStep() {
-    final currentIndex = _overrideOrder.indexOf(_overrideView);
-    if (currentIndex < _overrideOrder.length - 1) {
-      _setOverrideView(_overrideOrder[currentIndex + 1]);
-    }
-  }
-
-  void _goToPreviousOverrideStep() {
-    final currentIndex = _overrideOrder.indexOf(_overrideView);
-    if (currentIndex > 0) {
-      _setOverrideView(_overrideOrder[currentIndex - 1]);
-    }
-  }
-
-  Widget _buildDebugNavBar() {
-    final currentIndex = _overrideOrder.indexOf(_overrideView);
-    return SafeArea(
-      top: false,
-      child: BottomAppBar(
-        color: Colors.grey[100],
-        child: SizedBox(
-          height: 44,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-            child: Row(
-              children: [
-                IconButton(
-                  iconSize: 20,
-                  padding: const EdgeInsets.all(4),
-                  tooltip: 'Previous Step',
-                  onPressed: currentIndex > 0
-                      ? _goToPreviousOverrideStep
-                      : null,
-                  icon: const Icon(Icons.chevron_left),
-                ),
-                Flexible(
-                  child: Text(
-                    'Debug Step: ${_overrideView.name}',
-                    textAlign: TextAlign.center,
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  iconSize: 20,
-                  padding: const EdgeInsets.all(4),
-                  tooltip: 'Next Step',
-                  onPressed: currentIndex < _overrideOrder.length - 1
-                      ? _goToNextOverrideStep
-                      : null,
-                  icon: const Icon(Icons.chevron_right),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showOverrideMenu() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.link_off),
-              title: const Text('Connection Screen'),
-              onTap: () {
-                Navigator.pop(context);
-                _setOverrideView(OverrideView.connection);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.explore),
-              title: const Text('Azimuth Sweep'),
-              onTap: () {
-                Navigator.pop(context);
-                _setOverrideView(OverrideView.azimuthSweep);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.height),
-              title: const Text('Elevation Sweep'),
-              onTap: () {
-                Navigator.pop(context);
-                _setOverrideView(OverrideView.elevationSweep);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.dashboard),
-              title: const Text('Alignment Screen'),
-              onTap: () {
-                Navigator.pop(context);
-                _setOverrideView(OverrideView.alignment);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.check_circle),
-              title: const Text('Completed Screen'),
-              onTap: () {
-                Navigator.pop(context);
-                _setOverrideView(OverrideView.completed);
-              },
-            ),
-            const Divider(),
-            ListTile(
-              leading: Icon(_overrideMode ? Icons.stop_circle : Icons.tune),
-              title: Text(
-                _overrideMode ? 'Disable Override' : 'Enable Override',
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                if (_overrideMode) {
-                  _disableOverride();
-                } else {
-                  _setOverrideView(OverrideView.alignment);
-                }
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  IconButton _buildOverrideButton() {
-    return IconButton(
-      tooltip: _overrideMode ? 'Override Mode (On)' : 'Override Mode',
-      icon: Icon(_overrideMode ? Icons.tune : Icons.tune_outlined),
-      onPressed: _showOverrideMenu,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     // Show connection screen if not yet connected
-    if ((!_isConnected && !_overrideMode) ||
-        (_overrideMode && _overrideView == OverrideView.connection)) {
+    if (!_isConnected) {
       return Scaffold(
-        bottomNavigationBar: _overrideMode ? _buildDebugNavBar() : null,
         body: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -880,7 +636,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
               end: Alignment.bottomRight,
               colors: [
                 Theme.of(context).colorScheme.primary,
-                Colors.green[900]!,
+                kThemeBurgundyDark,
               ],
             ),
           ),
@@ -917,31 +673,11 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  onPressed: _showOverrideMenu,
-                  icon: Icon(_overrideMode ? Icons.tune : Icons.tune_outlined),
-                  label: Text(
-                    _overrideMode ? 'Override Menu' : 'Override / Demo Mode',
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
               ],
             ),
           ),
         ),
       );
-    }
-
-    if (_overrideMode && _overrideView == OverrideView.azimuthSweep) {
-      return _buildAzimuthSweepScreen();
-    }
-
-    if (_overrideMode && _overrideView == OverrideView.elevationSweep) {
-      return _buildElevationSweepScreen();
     }
 
     // Show sweep phase screen
@@ -959,16 +695,12 @@ class _AlignmentPageState extends State<AlignmentPage> {
     // Show alignment screen (original flow)
     if (_processCompleted) {
       return Scaffold(
-        bottomNavigationBar: _overrideMode ? _buildDebugNavBar() : null,
         body: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [
-                Theme.of(context).colorScheme.primary,
-                Colors.green[700]!,
-              ],
+              colors: [Theme.of(context).colorScheme.primary, kThemeBurgundy],
             ),
           ),
           child: Center(
@@ -1041,7 +773,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         actions: [
-          _buildOverrideButton(),
           // Connection status indicator
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1052,7 +783,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   children: [
                     Icon(
                       _isConnected ? Icons.cloud_done : Icons.cloud_off,
-                      color: _isConnected ? Colors.green[500] : Colors.red[300],
+                      color: _isConnected ? kThemeBurgundy : Colors.red[300],
                       size: 20,
                     ),
                     const SizedBox(width: 4),
@@ -1115,7 +846,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
           },
         ),
       ),
-      bottomNavigationBar: _overrideMode ? _buildDebugNavBar() : null,
     );
   }
 
@@ -1126,9 +856,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           title: Text('Azimuth Sweep - Side $_currentSide'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
-          actions: [_buildOverrideButton()],
         ),
-        bottomNavigationBar: _overrideMode ? _buildDebugNavBar() : null,
         body: SafeArea(
           child: SingleChildScrollView(
             child: Center(
@@ -1142,20 +870,20 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
-                        color: Colors.green[100],
+                        color: kThemeNavyLight,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
                               Icons.check_circle,
-                              color: Colors.green[700],
+                              color: kThemeNavy,
                               size: 20,
                             ),
                             const SizedBox(width: 8),
                             Text(
                               'Side 1 Complete',
                               style: TextStyle(
-                                color: Colors.green[700],
+                                color: kThemeNavy,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -1166,11 +894,15 @@ class _AlignmentPageState extends State<AlignmentPage> {
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
-                      color: Colors.amber[100],
+                      color: kThemeBurgundyLight,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.info, size: 40, color: Colors.amber[700]),
+                          const Icon(
+                            Icons.info,
+                            size: 40,
+                            color: kThemeBurgundy,
+                          ),
                           const SizedBox(height: 12),
                           Text(
                             'Azimuth Sweep in Progress - Side $_currentSide',
@@ -1243,7 +975,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                         .titleLarge
                                         ?.copyWith(
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.green[700],
+                                          color: kThemeBurgundy,
                                         ),
                                   ),
                                 ],
@@ -1304,7 +1036,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                 icon: const Icon(Icons.check),
                                 label: const Text('Sweep Complete'),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green[600],
+                                  backgroundColor: kThemeBurgundy,
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 24,
@@ -1333,9 +1065,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           title: Text('Azimuth Alignment - Side $_currentSide'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
-          actions: [_buildOverrideButton()],
         ),
-        bottomNavigationBar: _overrideMode ? _buildDebugNavBar() : null,
         body: SafeArea(
           child: Column(
             children: [
@@ -1349,8 +1079,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.green[100],
-                          border: Border.all(color: Colors.green[500]!),
+                          color: kThemeNavyLight,
+                          border: Border.all(color: kThemeNavy),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
@@ -1360,7 +1090,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                               children: [
                                 const Icon(
                                   Icons.check_circle,
-                                  color: Colors.green,
+                                  color: kThemeBurgundy,
                                   size: 24,
                                 ),
                                 const SizedBox(width: 8),
@@ -1371,7 +1101,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                   style: Theme.of(context).textTheme.titleMedium
                                       ?.copyWith(
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.green[700],
+                                        color: kThemeNavy,
                                       ),
                                 ),
                               ],
@@ -1392,7 +1122,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                               'Maximum RSL: ${_azimuthMaxSweepRSL.toStringAsFixed(1)} dBm at ${_azimuthMaxSweepDegree.toStringAsFixed(1)}°',
                               style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(
-                                    color: Colors.green[700],
+                                    color: kThemeBurgundy,
                                     fontWeight: FontWeight.bold,
                                   ),
                             ),
@@ -1405,18 +1135,18 @@ class _AlignmentPageState extends State<AlignmentPage> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.blue[50],
-                            border: Border.all(color: Colors.blue[300]!),
+                            color: kThemeNavyLight,
+                            border: Border.all(color: kThemeNavy),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.wifi, color: Colors.blue[700]),
+                              const Icon(Icons.wifi, color: kThemeNavy),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
                                   'Sweep data will be received automatically from Pi 5 when you run the motor control script.',
-                                  style: TextStyle(color: Colors.blue[800]),
+                                  style: const TextStyle(color: kThemeNavyDark),
                                 ),
                               ),
                             ],
@@ -1451,8 +1181,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.amber[100],
-                            border: Border.all(color: Colors.amber[500]!),
+                            color: kThemeBurgundyLight,
+                            border: Border.all(color: kThemeBurgundy),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Column(
@@ -1468,7 +1198,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                 'Maximum signal at: ${_azimuthMaxSweepDegree.toStringAsFixed(1)}°',
                                 style: Theme.of(context).textTheme.bodyMedium
                                     ?.copyWith(
-                                      color: Colors.green[700],
+                                      color: kThemeBurgundy,
                                       fontWeight: FontWeight.bold,
                                     ),
                               ),
@@ -1481,10 +1211,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.orange[50],
-                                  border: Border.all(
-                                    color: Colors.orange[300]!,
-                                  ),
+                                  color: kThemeNavyLight,
+                                  border: Border.all(color: kThemeNavy),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: RichText(
@@ -1503,7 +1231,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                             '${_azimuthDegreesToMaxRSL.abs().toStringAsFixed(1)}°',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.orange,
+                                          color: kThemeBurgundy,
                                           fontSize: 18,
                                         ),
                                       ),
@@ -1557,9 +1285,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           title: Text('Elevation Sweep - Side $_currentSide'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
-          actions: [_buildOverrideButton()],
         ),
-        bottomNavigationBar: _overrideMode ? _buildDebugNavBar() : null,
         body: SafeArea(
           child: SingleChildScrollView(
             child: Center(
@@ -1573,20 +1299,20 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
-                        color: Colors.green[100],
+                        color: kThemeNavyLight,
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
                               Icons.check_circle,
-                              color: Colors.green[700],
+                              color: kThemeNavy,
                               size: 20,
                             ),
                             const SizedBox(width: 8),
                             Text(
                               'Side 1 Complete',
                               style: TextStyle(
-                                color: Colors.green[700],
+                                color: kThemeNavy,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -1597,11 +1323,15 @@ class _AlignmentPageState extends State<AlignmentPage> {
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
-                      color: Colors.amber[100],
+                      color: kThemeBurgundyLight,
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.info, size: 40, color: Colors.amber[700]),
+                          const Icon(
+                            Icons.info,
+                            size: 40,
+                            color: kThemeBurgundy,
+                          ),
                           const SizedBox(height: 12),
                           Text(
                             'Elevation Sweep in Progress - Side $_currentSide',
@@ -1674,7 +1404,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                         .titleLarge
                                         ?.copyWith(
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.green[700],
+                                          color: kThemeBurgundy,
                                         ),
                                   ),
                                 ],
@@ -1735,7 +1465,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                 icon: const Icon(Icons.check),
                                 label: const Text('Sweep Complete'),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.green[600],
+                                  backgroundColor: kThemeBurgundy,
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 24,
@@ -1764,9 +1494,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           title: Text('Elevation Alignment - Side $_currentSide'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
-          actions: [_buildOverrideButton()],
         ),
-        bottomNavigationBar: _overrideMode ? _buildDebugNavBar() : null,
         body: SafeArea(
           child: Column(
             children: [
@@ -1780,8 +1508,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.green[100],
-                          border: Border.all(color: Colors.green[500]!),
+                          color: kThemeNavyLight,
+                          border: Border.all(color: kThemeNavy),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Column(
@@ -1791,7 +1519,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                               children: [
                                 const Icon(
                                   Icons.check_circle,
-                                  color: Colors.green,
+                                  color: kThemeBurgundy,
                                   size: 24,
                                 ),
                                 const SizedBox(width: 8),
@@ -1802,7 +1530,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                   style: Theme.of(context).textTheme.titleMedium
                                       ?.copyWith(
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.green[700],
+                                        color: kThemeNavy,
                                       ),
                                 ),
                               ],
@@ -1823,7 +1551,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                               'Maximum RSL: ${_elevationMaxSweepRSL.toStringAsFixed(1)} dBm at ${_elevationMaxSweepDegree.toStringAsFixed(1)}°',
                               style: Theme.of(context).textTheme.bodyMedium
                                   ?.copyWith(
-                                    color: Colors.green[700],
+                                    color: kThemeBurgundy,
                                     fontWeight: FontWeight.bold,
                                   ),
                             ),
@@ -1836,18 +1564,18 @@ class _AlignmentPageState extends State<AlignmentPage> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.blue[50],
-                            border: Border.all(color: Colors.blue[300]!),
+                            color: kThemeNavyLight,
+                            border: Border.all(color: kThemeNavy),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.wifi, color: Colors.blue[700]),
+                              const Icon(Icons.wifi, color: kThemeNavy),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
                                   'Sweep data will be received automatically from Pi 5 when you run the motor control script.',
-                                  style: TextStyle(color: Colors.blue[800]),
+                                  style: const TextStyle(color: kThemeNavyDark),
                                 ),
                               ),
                             ],
@@ -1882,8 +1610,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
                         Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: Colors.amber[100],
-                            border: Border.all(color: Colors.amber[500]!),
+                            color: kThemeBurgundyLight,
+                            border: Border.all(color: kThemeBurgundy),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Column(
@@ -1899,7 +1627,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                 'Maximum signal at: ${_elevationMaxSweepDegree.toStringAsFixed(1)}°',
                                 style: Theme.of(context).textTheme.bodyMedium
                                     ?.copyWith(
-                                      color: Colors.green[700],
+                                      color: kThemeBurgundy,
                                       fontWeight: FontWeight.bold,
                                     ),
                               ),
@@ -1912,10 +1640,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: Colors.orange[50],
-                                  border: Border.all(
-                                    color: Colors.orange[300]!,
-                                  ),
+                                  color: kThemeNavyLight,
+                                  border: Border.all(color: kThemeNavy),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: RichText(
@@ -1934,7 +1660,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                                             '${_elevationDegreesToMaxRSL.abs().toStringAsFixed(1)}°',
                                         style: const TextStyle(
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.orange,
+                                          color: kThemeBurgundy,
                                           fontSize: 18,
                                         ),
                                       ),
@@ -2026,7 +1752,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.green[600],
+                  color: kThemeBurgundy,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -2132,10 +1858,10 @@ class _AlignmentPageState extends State<AlignmentPage> {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: isActive ? Colors.green[100] : Colors.white,
+        color: isActive ? kThemeBurgundyLight : Colors.white,
         border: Border.all(
           color: isConfirmed
-              ? Colors.green[600]!
+              ? kThemeBurgundy
               : isActive
               ? Theme.of(context).colorScheme.primary
               : Colors.grey[300]!,
@@ -2166,7 +1892,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       TextSpan(
                         text: 'Rotate LEFT ${degreesLeft.toStringAsFixed(1)}°',
                         style: const TextStyle(
-                          color: Colors.orange,
+                          color: kThemeBurgundy,
                           fontWeight: FontWeight.bold,
                         ),
                       )
@@ -2175,7 +1901,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                         text:
                             'Rotate RIGHT ${degreesRight.toStringAsFixed(1)}°',
                         style: const TextStyle(
-                          color: Colors.orange,
+                          color: kThemeBurgundy,
                           fontWeight: FontWeight.bold,
                         ),
                       )
@@ -2183,7 +1909,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       const TextSpan(
                         text: 'Aligned ✓',
                         style: TextStyle(
-                          color: Colors.green,
+                          color: kThemeBurgundy,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -2193,7 +1919,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
             ],
           ),
           if (isConfirmed)
-            Icon(Icons.check_circle, color: Colors.green[600], size: 32),
+            const Icon(Icons.check_circle, color: kThemeBurgundy, size: 32),
         ],
       ),
     );
@@ -2215,7 +1941,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 icon: const Icon(Icons.arrow_forward),
                 label: const Text('Start Elevation Sweep'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green[700],
+                  backgroundColor: kThemeBurgundy,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
                     horizontal: 32,
@@ -2238,15 +1964,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _elevationSweepData.clear();
       _elevationMaxSweepRSL = -100.0;
       _elevationDataLoaded = false;
-      // Seed demo data when in debug mode
-      if (_overrideMode) {
-        _seedElevationDemoData();
-      }
     });
-    // Send command to Pi 5 to start elevation sweep (unless in debug mode)
-    if (!_overrideMode) {
-      _sendStartSweep('elevation');
-    }
+    _sendStartSweep('elevation');
   }
 
   /// Start azimuth sweep - called on connection or when manually restarting
@@ -2256,22 +1975,12 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _azimuthSweepData.clear();
       _azimuthMaxSweepRSL = -100.0;
       _azimuthDataLoaded = false;
-      // Seed demo data when in debug mode
-      if (_overrideMode) {
-        _seedAzimuthDemoData();
-      }
     });
-    // Send command to Pi 5 to start azimuth sweep (unless in debug mode)
-    if (!_overrideMode) {
-      _sendStartSweep('azimuth');
-    }
+    _sendStartSweep('azimuth');
   }
 
   void _completeSweep() {
-    // Send command to Pi 5 to stop the sweep and get final data
-    if (!_overrideMode) {
-      _sendStopSweep();
-    }
+    _sendStopSweep();
     setState(() {
       _azimuthPhase = AzimuthPhase.sweepComplete;
     });
@@ -2316,10 +2025,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
         _azimuthPhase = AzimuthPhase.aligned;
         _azimuthConfirmed = true;
         _currentStep = AlignmentStep.elevation;
-        // Advance debug view if in override mode
-        if (_overrideMode) {
-          _overrideView = OverrideView.elevationSweep;
-        }
       });
 
       _showConfirmationDialog(
@@ -2336,10 +2041,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
   }
 
   void _completeElevationSweep() {
-    // Send command to Pi 5 to stop the sweep and get final data
-    if (!_overrideMode) {
-      _sendStopSweep();
-    }
+    _sendStopSweep();
     setState(() {
       _elevationPhase = ElevationPhase.sweepComplete;
     });
@@ -2354,10 +2056,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
           _elevationPhase = ElevationPhase.aligned;
           _elevationConfirmed = true;
           _side1Complete = true;
-          // Advance debug view to azimuth sweep for side 2 if in override mode
-          if (_overrideMode) {
-            _overrideView = OverrideView.azimuthSweep;
-          }
         });
 
         _showSideCompleteDialog(
@@ -2385,10 +2083,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
           _elevationConfirmed = true;
           _processCompleted = true;
           _currentStep = AlignmentStep.finalized;
-          // Advance debug view to completed if in override mode
-          if (_overrideMode) {
-            _overrideView = OverrideView.completed;
-          }
         });
 
         _showSideCompleteDialog(
@@ -2430,11 +2124,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _elevationDataLoaded = false;
       // Reset step
       _currentStep = AlignmentStep.azimuth;
-      // Seed demo data when in debug mode
-      if (_overrideMode) {
-        _seedAzimuthDemoData();
-      }
     });
+
+    _sendStartSweep('azimuth');
   }
 
   void _showConfirmationDialog({
@@ -2455,7 +2147,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           ),
           ElevatedButton(
             onPressed: onConfirm,
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green[600]),
+            style: ElevatedButton.styleFrom(backgroundColor: kThemeBurgundy),
             child: const Text('Confirm'),
           ),
         ],
@@ -2479,7 +2171,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.check_circle, color: Colors.green[600], size: 28),
+            const Icon(Icons.check_circle, color: kThemeBurgundy, size: 28),
             const SizedBox(width: 12),
             Expanded(child: Text(title)),
           ],
@@ -2493,20 +2185,20 @@ class _AlignmentPageState extends State<AlignmentPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange[50],
-                border: Border.all(color: Colors.orange[300]!),
+                color: kThemeBurgundyLight,
+                border: Border.all(color: kThemeBurgundy),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.link_off, color: Colors.orange[700], size: 24),
+                  const Icon(Icons.link_off, color: kThemeBurgundy, size: 24),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       disconnectMessage,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.orange[900],
+                        color: kThemeBurgundyDark,
                         fontSize: 15,
                       ),
                     ),
@@ -2518,20 +2210,20 @@ class _AlignmentPageState extends State<AlignmentPage> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue[50],
-                border: Border.all(color: Colors.blue[300]!),
+                color: kThemeNavyLight,
+                border: Border.all(color: kThemeNavy),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.arrow_forward, color: Colors.blue[700], size: 24),
+                  const Icon(Icons.arrow_forward, color: kThemeNavy, size: 24),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       nextAction,
                       style: TextStyle(
                         fontWeight: FontWeight.w500,
-                        color: Colors.blue[900],
+                        color: kThemeNavyDark,
                         fontSize: 14,
                       ),
                     ),
@@ -2554,7 +2246,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
             icon: const Icon(Icons.check),
             label: const Text('Continue'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green[600],
+              backgroundColor: kThemeBurgundy,
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
@@ -2591,13 +2283,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _elevationConfirmed = false;
       _isRecordingElevation = false;
       _elevationDataLoaded = false;
-
-      // Reset override mode
-      if (_overrideMode) {
-        _overrideView = OverrideView.azimuthSweep;
-        _seedAzimuthDemoData();
-      }
     });
+
+    _sendStartSweep('azimuth');
   }
 
   // Support helpline prompt: displays the support phone number to call
@@ -2621,7 +2309,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFF0D47A1),
+                color: kThemeNavy,
               ),
             ),
           ],
@@ -2646,14 +2334,14 @@ class SineWavePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF0D47A1)
+      ..color = kThemeNavy
       ..strokeWidth = 3
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round
       ..style = PaintingStyle.stroke;
 
     final fillPaint = Paint()
-      ..color = const Color(0xFF0D47A1).withValues(alpha: 0.1)
+      ..color = kThemeNavy.withValues(alpha: 0.1)
       ..style = PaintingStyle.fill;
 
     final gridPaint = Paint()
@@ -2675,7 +2363,7 @@ class SineWavePainter extends CustomPainter {
       Offset(0, maxY),
       Offset(size.width, maxY),
       Paint()
-        ..color = Colors.green[400]!
+        ..color = kThemeBurgundy
         ..strokeWidth = 2
         ..style = PaintingStyle.stroke,
     );
@@ -2747,7 +2435,7 @@ class SineWavePainter extends CustomPainter {
       const Offset(legendX, legendY),
       const Offset(legendX + 10, legendY),
       Paint()
-        ..color = Colors.green[400]!
+        ..color = kThemeBurgundy
         ..strokeWidth = 2,
     );
     final maxLabel = TextPainter(
