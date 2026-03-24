@@ -1,6 +1,5 @@
 ﻿import 'package:flutter/material.dart';
 import 'dart:async' show TimeoutException;
-import 'dart:math' show sin;
 import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
@@ -102,7 +101,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
 
   // Signal data from Raspberry Pi
   double _currentRSL = -85.5; // dBm
-  final double _maxRSL = -75.0; // dBm
   double _azimuthDegreesLeft = 0.0; // Degrees to rotate left to reach max
   double _azimuthDegreesRight = 0.0; // Degrees to rotate right to reach max
   double _elevationDegreesUp = 0.0; // Degrees to rotate up to reach max
@@ -729,6 +727,14 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _elevationDegreesDown = _elevationDegreesToMaxRSL.abs();
       _elevationDegreesUp = 0;
     }
+  }
+
+  /// Best amplitude actually observed from sweep data — null until a sweep completes.
+  double? get _bestSweepPeak {
+    double best = -100.0;
+    if (_azimuthMaxSweepRSL > -100.0) best = _azimuthMaxSweepRSL;
+    if (_elevationMaxSweepRSL > best) best = _elevationMaxSweepRSL;
+    return best > -100.0 ? best : null;
   }
 
   @override
@@ -1413,9 +1419,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
           const SizedBox(height: 8),
           Expanded(
             child: CustomPaint(
-              painter: SineWavePainter(
+              painter: AmplitudeLevelPainter(
                 currentRSL: _currentRSL,
-                maxRSL: _maxRSL,
+                peakRSL: _bestSweepPeak,
               ),
               size: Size.infinite,
             ),
@@ -1711,13 +1717,14 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 accentColor: Theme.of(context).colorScheme.primary,
                 supportingText: 'Live receiver reading',
               ),
-              _buildVnaMetricTile(
-                icon: Icons.flag_rounded,
-                label: 'Reference Peak',
-                value: '${_maxRSL.toStringAsFixed(1)} dBm',
-                accentColor: kThemeBurgundy,
-                supportingText: 'Target peak for comparison',
-              ),
+              if (_bestSweepPeak != null)
+                _buildVnaMetricTile(
+                  icon: Icons.flag_rounded,
+                  label: 'Best Sweep Peak',
+                  value: '${_bestSweepPeak!.toStringAsFixed(1)} dBm',
+                  accentColor: kThemeBurgundy,
+                  supportingText: 'Highest amplitude from sweeps',
+                ),
             ],
           ),
           const SizedBox(height: 14),
@@ -1742,16 +1749,16 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 children: [
                   Expanded(
                     child: CustomPaint(
-                      painter: SineWavePainter(
+                      painter: AmplitudeLevelPainter(
                         currentRSL: _currentRSL,
-                        maxRSL: _maxRSL,
+                        peakRSL: _bestSweepPeak,
                       ),
                       size: Size.infinite,
                     ),
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Real-time signal graph',
+                    'Live amplitude level (dBm)',
                     style: Theme.of(
                       context,
                     ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),
@@ -2308,172 +2315,97 @@ class _AlignmentPageState extends State<AlignmentPage> {
   }
 }
 
-class SineWavePainter extends CustomPainter {
+class AmplitudeLevelPainter extends CustomPainter {
   final double currentRSL;
-  final double maxRSL;
+  final double? peakRSL;
 
-  SineWavePainter({required this.currentRSL, required this.maxRSL});
+  static const double _minDb = -120.0;
+  static const double _maxDb = 0.0;
+
+  AmplitudeLevelPainter({required this.currentRSL, this.peakRSL});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = kThemeNavy
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..style = PaintingStyle.stroke;
+    // Reserve bottom strip for dB labels
+    const labelHeight = 14.0;
+    final barHeight = size.height - labelHeight;
 
-    final fillPaint = Paint()
-      ..color = kThemeNavy.withValues(alpha: 0.1)
-      ..style = PaintingStyle.fill;
+    // Background track
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, 0, size.width, barHeight),
+        const Radius.circular(6),
+      ),
+      Paint()..color = Colors.grey[200]!,
+    );
 
+    // Filled bar — width proportional to current RSL
+    final clamped = currentRSL.clamp(_minDb, _maxDb);
+    final fraction = (clamped - _minDb) / (_maxDb - _minDb);
+    final filledWidth = size.width * fraction;
+
+    // Colour: red (weak signal) → yellow → green (strong signal)
+    final barColor = HSVColor.lerp(
+      const HSVColor.fromAHSV(1.0, 0, 0.85, 0.80),
+      const HSVColor.fromAHSV(1.0, 120, 0.80, 0.70),
+      fraction.clamp(0.0, 1.0),
+    )!.toColor();
+
+    if (filledWidth > 0) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromLTWH(0, 0, filledWidth, barHeight),
+          const Radius.circular(6),
+        ),
+        Paint()..color = barColor,
+      );
+    }
+
+    // Grid lines at every 20 dB
     final gridPaint = Paint()
-      ..color = Colors.grey[300]!
-      ..strokeWidth = 0.5;
-
-    // Draw grid lines
-    const gridSpacing = 20.0;
-    for (double i = 0; i < size.width; i += gridSpacing) {
-      canvas.drawLine(Offset(i, 0), Offset(i, size.height), gridPaint);
-    }
-    for (double i = 0; i < size.height; i += gridSpacing) {
-      canvas.drawLine(Offset(0, i), Offset(size.width, i), gridPaint);
+      ..color = Colors.white.withValues(alpha: 0.55)
+      ..strokeWidth = 1;
+    for (double db = -100; db <= -20; db += 20) {
+      final x = (db - _minDb) / (_maxDb - _minDb) * size.width;
+      canvas.drawLine(Offset(x, 0), Offset(x, barHeight), gridPaint);
     }
 
-    // Draw peak amplitude line
-    final maxY = size.height * 0.1;
-    canvas.drawLine(
-      Offset(0, maxY),
-      Offset(size.width, maxY),
-      Paint()
-        ..color = kThemeBurgundy
-        ..strokeWidth = 2
-        ..style = PaintingStyle.stroke,
-    );
-
-    // Draw current amplitude level line
-    final rslRange = maxRSL - (-100.0);
-    final currentRSLNormalized = (maxRSL - currentRSL) / rslRange;
-    final currentY =
-        size.height * 0.1 + (currentRSLNormalized * (size.height * 0.8));
-
-    // Draw dashed line for current amplitude
-    final dashPaint = Paint()
-      ..color = Colors.red[600]!
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke;
-
-    const dashWidth = 5.0;
-    const dashSpace = 5.0;
-    double xPos = 0;
-    while (xPos < size.width) {
+    // Sweep peak marker (burgundy vertical line)
+    if (peakRSL != null) {
+      final peakClamped = peakRSL!.clamp(_minDb, _maxDb);
+      final peakX = (peakClamped - _minDb) / (_maxDb - _minDb) * size.width;
       canvas.drawLine(
-        Offset(xPos, currentY),
-        Offset((xPos + dashWidth).clamp(0, size.width), currentY),
-        dashPaint,
+        Offset(peakX, 0),
+        Offset(peakX, barHeight),
+        Paint()
+          ..color = kThemeBurgundy
+          ..strokeWidth = 2.5,
       );
-      xPos += dashWidth + dashSpace;
     }
 
-    // Create adaptive sine wave based on actual RSL
-    final path = Path();
-    final baseAmplitude = size.height * 0.25;
-    const frequency = 0.02;
-
-    for (double x = 0; x < size.width; x++) {
-      // Normalize RSL: 0 = worst (-100 dBm), 1 = best (maxRSL)
-      final rslFactor = (maxRSL - currentRSL) / rslRange;
-
-      // Wave amplitude decreases as signal improves (more stable signal = flatter line)
-      final amplitude = baseAmplitude * (rslFactor * 0.7 + 0.1);
-
-      // Oscillate around the current amplitude line
-      final baseWave = amplitude * sin(x * frequency);
-      final y = currentY + baseWave;
-
-      if (x == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-
-    // Draw the fill under the curve
-    final fillPath = Path.from(path);
-    fillPath.lineTo(size.width, size.height);
-    fillPath.lineTo(0, size.height);
-    fillPath.close();
-    canvas.drawPath(fillPath, fillPaint);
-
-    // Draw the signal waveform
-    canvas.drawPath(path, paint);
-
-    // Draw legend
-    const legendX = 12.0;
-    const legendY = 8.0;
-    const legendItemHeight = 16.0;
-
-    // Green line legend (Peak amplitude)
-    canvas.drawLine(
-      const Offset(legendX, legendY),
-      const Offset(legendX + 10, legendY),
-      Paint()
-        ..color = kThemeBurgundy
-        ..strokeWidth = 2,
+    // dB axis labels
+    const labelStyle = TextStyle(
+      color: Colors.black54,
+      fontSize: 9,
+      fontWeight: FontWeight.w400,
     );
-    final maxLabel = TextPainter(
-      text: TextSpan(
-        text: 'Peak: ${maxRSL.toStringAsFixed(1)} dBm',
-        style: const TextStyle(
-          color: Colors.black87,
-          fontSize: 10,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-    maxLabel.layout();
-    maxLabel.paint(canvas, const Offset(legendX + 14, legendY - 6));
-
-    // Red dashed line legend (Current amplitude)
-    final dashedLinePaint = Paint()
-      ..color = Colors.red[600]!
-      ..strokeWidth = 2;
-
-    const legendDashWidth = 3.0;
-    const legendDashSpace = 3.0;
-    double xLegend = legendX;
-    while (xLegend < legendX + 10) {
-      canvas.drawLine(
-        Offset(xLegend, legendY + legendItemHeight),
+    for (final db in const [-120.0, -80.0, -40.0, 0.0]) {
+      final x = (db - _minDb) / (_maxDb - _minDb) * size.width;
+      final tp = TextPainter(
+        text: TextSpan(text: '${db.toInt()}', style: labelStyle),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(
+        canvas,
         Offset(
-          (xLegend + legendDashWidth).clamp(legendX, legendX + 10),
-          legendY + legendItemHeight,
+          (x - tp.width / 2).clamp(0.0, size.width - tp.width),
+          barHeight + 2,
         ),
-        dashedLinePaint,
       );
-      xLegend += legendDashWidth + legendDashSpace;
     }
-    final currentLabel = TextPainter(
-      text: TextSpan(
-        text: 'Current Amp: ${currentRSL.toStringAsFixed(1)} dBm',
-        style: const TextStyle(
-          color: Colors.black87,
-          fontSize: 10,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    );
-    currentLabel.layout();
-    currentLabel.paint(
-      canvas,
-      const Offset(legendX + 14, legendY + legendItemHeight - 6),
-    );
   }
 
   @override
-  bool shouldRepaint(SineWavePainter oldDelegate) {
-    return oldDelegate.currentRSL != currentRSL || oldDelegate.maxRSL != maxRSL;
-  }
+  bool shouldRepaint(AmplitudeLevelPainter old) =>
+      old.currentRSL != currentRSL || old.peakRSL != peakRSL;
 }
