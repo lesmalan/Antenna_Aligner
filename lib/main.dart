@@ -1,10 +1,8 @@
 ﻿import 'package:flutter/material.dart';
 import 'dart:async' show TimeoutException;
-import 'dart:math' show sin, max;
+import 'dart:math' show sin;
 import 'dart:convert';
-import 'dart:io';
 import 'package:web_socket_channel/web_socket_channel.dart';
-import 'package:file_picker/file_picker.dart';
 
 /// Data point from sweep containing degree position and amplitude
 class SweepDataPoint {
@@ -88,7 +86,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
   double _azimuthDegreesToMaxRSL =
       0.0; // Calculated: degrees to rotate to reach peak amplitude
   bool _isRecordingAzimuth = false; // Flag: continuously recording azimuth data
-  bool _azimuthDataLoaded = false; // Flag: CSV data has been loaded
 
   // Elevation sweep data collection
   ElevationPhase _elevationPhase = ElevationPhase.waitingForStart;
@@ -102,7 +99,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
       0.0; // Calculated: degrees to rotate to reach peak amplitude
   bool _isRecordingElevation =
       false; // Flag: continuously recording elevation data
-  bool _elevationDataLoaded = false; // Flag: CSV data has been loaded
 
   // Signal data from Raspberry Pi
   double _currentRSL = -85.5; // dBm
@@ -177,187 +173,13 @@ class _AlignmentPageState extends State<AlignmentPage> {
         (message) {
           if (!mounted) return;
           try {
-            final data = jsonDecode(message);
+            final decoded = jsonDecode(message);
+            if (decoded is! Map) {
+              return;
+            }
+            final data = Map<String, dynamic>.from(decoded);
             setState(() {
-              _isConnected = true;
-              _connectionStatus = 'Connected';
-
-              // Start sweep automatically on first connection
-              if (_azimuthPhase == AzimuthPhase.waitingForConnection) {
-                _azimuthPhase = AzimuthPhase.sweepInProgress;
-                _azimuthSweepData.clear();
-                _azimuthMaxSweepRSL = -100.0;
-              }
-
-              // Update amplitude if provided
-              if (data.containsKey('rsl')) {
-                _currentRSL = (data['rsl'] as num).toDouble();
-              }
-
-              // Update degree positions if provided
-              if (data.containsKey('azimuth_degree')) {
-                _azimuthCurrentDegree = (data['azimuth_degree'] as num)
-                    .toDouble();
-              }
-              if (data.containsKey('elevation_degree')) {
-                _elevationCurrentDegree = (data['elevation_degree'] as num)
-                    .toDouble();
-              }
-
-              // Handle sweep data from Pi 5 (automatic mode - no CSV upload needed)
-              if (data.containsKey('sweep_active') &&
-                  data['sweep_active'] == true) {
-                final sweepType = data['sweep_type'] as String?;
-                if (data.containsKey('sweep_point')) {
-                  final point = data['sweep_point'];
-                  final degree = (point['degree'] as num).toDouble();
-                  final amplitude = (point['amplitude'] as num).toDouble();
-
-                  if (sweepType == 'azimuth') {
-                    // Auto-start azimuth sweep if not already
-                    if (_azimuthPhase != AzimuthPhase.sweepInProgress) {
-                      _azimuthPhase = AzimuthPhase.sweepInProgress;
-                      _azimuthSweepData.clear();
-                      _azimuthMaxSweepRSL = -100.0;
-                    }
-                    _azimuthSweepData.add(
-                      SweepDataPoint(degree: degree, amplitude: amplitude),
-                    );
-                    if (amplitude > _azimuthMaxSweepRSL) {
-                      _azimuthMaxSweepRSL = amplitude;
-                      _azimuthMaxSweepDegree = degree;
-                    }
-                  } else if (sweepType == 'elevation') {
-                    // Auto-start elevation sweep if not already
-                    if (_elevationPhase != ElevationPhase.sweepInProgress) {
-                      _elevationPhase = ElevationPhase.sweepInProgress;
-                      _elevationSweepData.clear();
-                      _elevationMaxSweepRSL = -100.0;
-                    }
-                    _elevationSweepData.add(
-                      SweepDataPoint(degree: degree, amplitude: amplitude),
-                    );
-                    if (amplitude > _elevationMaxSweepRSL) {
-                      _elevationMaxSweepRSL = amplitude;
-                      _elevationMaxSweepDegree = degree;
-                    }
-                  }
-                }
-              }
-
-              // Handle sweep start acknowledgment from Pi 5
-              if (data.containsKey('sweep_status') &&
-                  data['sweep_status'] == 'started') {
-                final sweepType = data['sweep_type'] as String?;
-                if (sweepType == 'azimuth') {
-                  _azimuthPhase = AzimuthPhase.sweepInProgress;
-                  _azimuthSweepData.clear();
-                  _azimuthMaxSweepRSL = -100.0;
-                } else if (sweepType == 'elevation') {
-                  _elevationPhase = ElevationPhase.sweepInProgress;
-                  _elevationSweepData.clear();
-                  _elevationMaxSweepRSL = -100.0;
-                }
-                debugPrint('Pi 5 acknowledged $sweepType sweep start');
-              }
-
-              // Handle sweep completion from Pi 5
-              if (data.containsKey('sweep_status') &&
-                  data['sweep_status'] == 'completed') {
-                final sweepType = data['sweep_type'] as String?;
-                // Process bulk sweep data if provided
-                if (data.containsKey('sweep_data')) {
-                  final sweepDataList = data['sweep_data'] as List;
-                  if (sweepType == 'azimuth') {
-                    _azimuthSweepData.clear();
-                    _azimuthMaxSweepRSL = -100.0;
-                    for (final point in sweepDataList) {
-                      final degree = (point['degree'] as num).toDouble();
-                      final amplitude = (point['amplitude'] as num).toDouble();
-                      _azimuthSweepData.add(
-                        SweepDataPoint(degree: degree, amplitude: amplitude),
-                      );
-                      if (amplitude > _azimuthMaxSweepRSL) {
-                        _azimuthMaxSweepRSL = amplitude;
-                        _azimuthMaxSweepDegree = degree;
-                      }
-                    }
-                  } else if (sweepType == 'elevation') {
-                    _elevationSweepData.clear();
-                    _elevationMaxSweepRSL = -100.0;
-                    for (final point in sweepDataList) {
-                      final degree = (point['degree'] as num).toDouble();
-                      final amplitude = (point['amplitude'] as num).toDouble();
-                      _elevationSweepData.add(
-                        SweepDataPoint(degree: degree, amplitude: amplitude),
-                      );
-                      if (amplitude > _elevationMaxSweepRSL) {
-                        _elevationMaxSweepRSL = amplitude;
-                        _elevationMaxSweepDegree = degree;
-                      }
-                    }
-                  }
-                }
-                // Mark sweep as complete
-                if (sweepType == 'azimuth' && _azimuthSweepData.isNotEmpty) {
-                  _azimuthPhase = AzimuthPhase.sweepComplete;
-                  _azimuthDataLoaded = true;
-                  _calculateAzimuthDegreesToMax();
-                } else if (sweepType == 'elevation' &&
-                    _elevationSweepData.isNotEmpty) {
-                  _elevationPhase = ElevationPhase.sweepComplete;
-                  _elevationDataLoaded = true;
-                  _calculateElevationDegreesToMax();
-                }
-              }
-
-              // Legacy: manual recording mode (fallback if no auto sweep data)
-              if (_isRecordingAzimuth &&
-                  _azimuthPhase == AzimuthPhase.sweepInProgress) {
-                _azimuthSweepData.add(
-                  SweepDataPoint(
-                    degree: _azimuthCurrentDegree,
-                    amplitude: _currentRSL,
-                  ),
-                );
-                if (_currentRSL > _azimuthMaxSweepRSL) {
-                  _azimuthMaxSweepRSL = _currentRSL;
-                  _azimuthMaxSweepDegree = _azimuthCurrentDegree;
-                }
-              }
-
-              // Legacy: manual recording mode (fallback if no auto sweep data)
-              if (_isRecordingElevation &&
-                  _elevationPhase == ElevationPhase.sweepInProgress) {
-                _elevationSweepData.add(
-                  SweepDataPoint(
-                    degree: _elevationCurrentDegree,
-                    amplitude: _currentRSL,
-                  ),
-                );
-                if (_currentRSL > _elevationMaxSweepRSL) {
-                  _elevationMaxSweepRSL = _currentRSL;
-                  _elevationMaxSweepDegree = _elevationCurrentDegree;
-                }
-              }
-
-              // Update degree rotation hints if provided by server
-              if (data.containsKey('azimuth_degrees_left')) {
-                _azimuthDegreesLeft = (data['azimuth_degrees_left'] as num)
-                    .toDouble();
-              }
-              if (data.containsKey('azimuth_degrees_right')) {
-                _azimuthDegreesRight = (data['azimuth_degrees_right'] as num)
-                    .toDouble();
-              }
-              if (data.containsKey('elevation_degrees_up')) {
-                _elevationDegreesUp = (data['elevation_degrees_up'] as num)
-                    .toDouble();
-              }
-              if (data.containsKey('elevation_degrees_down')) {
-                _elevationDegreesDown = (data['elevation_degrees_down'] as num)
-                    .toDouble();
-              }
+              _applyIncomingPacket(data);
             });
           } catch (e) {
             debugPrint('Error parsing WebSocket data: $e');
@@ -427,162 +249,298 @@ class _AlignmentPageState extends State<AlignmentPage> {
     }
   }
 
-  /// Load azimuth sweep data from CSV file
-  Future<void> _loadAzimuthCSV() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['csv'],
-        dialogTitle: 'Select Azimuth Sweep CSV File',
-      );
+  void _applyIncomingPacket(Map<String, dynamic> data) {
+    _isConnected = true;
+    _connectionStatus = 'Connected';
 
-      if (result != null && result.files.single.path != null) {
-        final file = File(result.files.single.path!);
-        await _parseCSVFile(file, isAzimuth: true);
+    // Keep initial flow behavior: sweep starts once link is live.
+    if (_azimuthPhase == AzimuthPhase.waitingForConnection) {
+      _azimuthPhase = AzimuthPhase.sweepInProgress;
+      _azimuthSweepData.clear();
+      _azimuthMaxSweepRSL = -100.0;
+    }
+
+    final amplitude = _extractDouble(data, [
+      'rsl',
+      'amplitude',
+      'amplitude_db',
+      'amplitude_dB',
+      'signal',
+      'signal_db',
+      'level',
+    ]);
+    if (amplitude != null) {
+      _currentRSL = amplitude;
+    }
+
+    final azimuth = _extractDouble(data, [
+      'azimuth_degree',
+      'azimuth_deg',
+      'azimuth',
+      'current_azimuth',
+      'az',
+    ]);
+    if (azimuth != null) {
+      _azimuthCurrentDegree = azimuth;
+    }
+
+    final elevation = _extractDouble(data, [
+      'elevation_degree',
+      'elevation_deg',
+      'elevation',
+      'current_elevation',
+      'el',
+    ]);
+    if (elevation != null) {
+      _elevationCurrentDegree = elevation;
+    }
+
+    final sweepType = _extractString(data, [
+      'sweep_type',
+      'sweep_axis',
+      'axis',
+    ])?.toLowerCase();
+
+    final isSweepActive =
+        data['sweep_active'] == true || data['sweep_status'] == 'started';
+
+    if (isSweepActive) {
+      final point = _extractSweepPoint(data['sweep_point'], sweepType);
+      if (point != null) {
+        _applyLiveSweepPoint(sweepType, point);
       }
-    } catch (e) {
-      debugPrint('Error loading azimuth CSV: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error loading CSV: $e')));
+    }
+
+    final sweepStatus = _extractString(data, ['sweep_status'])?.toLowerCase();
+    if (sweepStatus == 'started') {
+      if (sweepType == 'azimuth') {
+        _azimuthPhase = AzimuthPhase.sweepInProgress;
+        _azimuthSweepData.clear();
+        _azimuthMaxSweepRSL = -100.0;
+      } else if (sweepType == 'elevation') {
+        _elevationPhase = ElevationPhase.sweepInProgress;
+        _elevationSweepData.clear();
+        _elevationMaxSweepRSL = -100.0;
+      }
+      debugPrint('Pi acknowledged $sweepType sweep start');
+    }
+
+    if (sweepStatus == 'completed') {
+      _applyCompletedSweepData(sweepType, data['sweep_data']);
+    }
+
+    // Fallback sampling mode if no structured sweep points are sent.
+    if (_isRecordingAzimuth && _azimuthPhase == AzimuthPhase.sweepInProgress) {
+      _azimuthSweepData.add(
+        SweepDataPoint(degree: _azimuthCurrentDegree, amplitude: _currentRSL),
+      );
+      if (_currentRSL > _azimuthMaxSweepRSL) {
+        _azimuthMaxSweepRSL = _currentRSL;
+        _azimuthMaxSweepDegree = _azimuthCurrentDegree;
+      }
+    }
+
+    if (_isRecordingElevation &&
+        _elevationPhase == ElevationPhase.sweepInProgress) {
+      _elevationSweepData.add(
+        SweepDataPoint(degree: _elevationCurrentDegree, amplitude: _currentRSL),
+      );
+      if (_currentRSL > _elevationMaxSweepRSL) {
+        _elevationMaxSweepRSL = _currentRSL;
+        _elevationMaxSweepDegree = _elevationCurrentDegree;
+      }
+    }
+
+    final azLeft = _extractDouble(data, [
+      'azimuth_degrees_left',
+      'azimuth_turns_left',
+    ]);
+    if (azLeft != null) {
+      _azimuthDegreesLeft = azLeft;
+    }
+
+    final azRight = _extractDouble(data, [
+      'azimuth_degrees_right',
+      'azimuth_turns_right',
+    ]);
+    if (azRight != null) {
+      _azimuthDegreesRight = azRight;
+    }
+
+    final elUp = _extractDouble(data, [
+      'elevation_degrees_up',
+      'elevation_turns_up',
+      'elevation_turns_left',
+    ]);
+    if (elUp != null) {
+      _elevationDegreesUp = elUp;
+    }
+
+    final elDown = _extractDouble(data, [
+      'elevation_degrees_down',
+      'elevation_turns_down',
+      'elevation_turns_right',
+    ]);
+    if (elDown != null) {
+      _elevationDegreesDown = elDown;
+    }
+  }
+
+  void _applyLiveSweepPoint(String? sweepType, SweepDataPoint point) {
+    if (sweepType == 'azimuth') {
+      if (_azimuthPhase != AzimuthPhase.sweepInProgress) {
+        _azimuthPhase = AzimuthPhase.sweepInProgress;
+        _azimuthSweepData.clear();
+        _azimuthMaxSweepRSL = -100.0;
+      }
+      _azimuthCurrentDegree = point.degree;
+      _azimuthSweepData.add(point);
+      if (point.amplitude > _azimuthMaxSweepRSL) {
+        _azimuthMaxSweepRSL = point.amplitude;
+        _azimuthMaxSweepDegree = point.degree;
+      }
+      _calculateAzimuthDegreesToMax();
+    } else if (sweepType == 'elevation') {
+      if (_elevationPhase != ElevationPhase.sweepInProgress) {
+        _elevationPhase = ElevationPhase.sweepInProgress;
+        _elevationSweepData.clear();
+        _elevationMaxSweepRSL = -100.0;
+      }
+      _elevationCurrentDegree = point.degree;
+      _elevationSweepData.add(point);
+      if (point.amplitude > _elevationMaxSweepRSL) {
+        _elevationMaxSweepRSL = point.amplitude;
+        _elevationMaxSweepDegree = point.degree;
+      }
+      _calculateElevationDegreesToMax();
+    }
+  }
+
+  void _applyCompletedSweepData(String? sweepType, dynamic rawSweepData) {
+    final points = <SweepDataPoint>[];
+    if (rawSweepData is List) {
+      for (final raw in rawSweepData) {
+        final parsedPoint = _extractSweepPoint(raw, sweepType);
+        if (parsedPoint != null) {
+          points.add(parsedPoint);
+        }
+      }
+    }
+
+    if (sweepType == 'azimuth') {
+      if (points.isNotEmpty) {
+        _azimuthSweepData
+          ..clear()
+          ..addAll(points);
+        _azimuthMaxSweepRSL = -100.0;
+        for (final point in points) {
+          if (point.amplitude > _azimuthMaxSweepRSL) {
+            _azimuthMaxSweepRSL = point.amplitude;
+            _azimuthMaxSweepDegree = point.degree;
+          }
+        }
+      }
+      if (_azimuthSweepData.isNotEmpty) {
+        _azimuthPhase = AzimuthPhase.sweepComplete;
+        _calculateAzimuthDegreesToMax();
+      }
+    } else if (sweepType == 'elevation') {
+      if (points.isNotEmpty) {
+        _elevationSweepData
+          ..clear()
+          ..addAll(points);
+        _elevationMaxSweepRSL = -100.0;
+        for (final point in points) {
+          if (point.amplitude > _elevationMaxSweepRSL) {
+            _elevationMaxSweepRSL = point.amplitude;
+            _elevationMaxSweepDegree = point.degree;
+          }
+        }
+      }
+      if (_elevationSweepData.isNotEmpty) {
+        _elevationPhase = ElevationPhase.sweepComplete;
+        _calculateElevationDegreesToMax();
       }
     }
   }
 
-  /// Load elevation sweep data from CSV file
-  Future<void> _loadElevationCSV() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['csv'],
-        dialogTitle: 'Select Elevation Sweep CSV File',
-      );
+  SweepDataPoint? _extractSweepPoint(dynamic rawPoint, String? sweepType) {
+    if (rawPoint is Map) {
+      final point = Map<String, dynamic>.from(rawPoint);
 
-      if (result != null && result.files.single.path != null) {
-        final file = File(result.files.single.path!);
-        await _parseCSVFile(file, isAzimuth: false);
+      double? degree = _extractDouble(point, [
+        'degree',
+        'position',
+        'x',
+        'azimuth_degree',
+        'azimuth_deg',
+        'elevation_degree',
+        'elevation_deg',
+      ]);
+
+      final amplitude = _extractDouble(point, [
+        'amplitude',
+        'rsl',
+        'amplitude_db',
+        'amplitude_dB',
+        'signal',
+        'value',
+      ]);
+
+      if (degree == null) {
+        if (sweepType == 'azimuth') {
+          degree = _azimuthCurrentDegree;
+        } else if (sweepType == 'elevation') {
+          degree = _elevationCurrentDegree;
+        }
       }
-    } catch (e) {
-      debugPrint('Error loading elevation CSV: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error loading CSV: $e')));
+
+      if (degree != null && amplitude != null) {
+        return SweepDataPoint(degree: degree, amplitude: amplitude);
+      }
+      return null;
+    }
+
+    if (rawPoint is List && rawPoint.length >= 2) {
+      final degree = _toDouble(rawPoint[0]);
+      final amplitude = _toDouble(rawPoint[1]);
+      if (degree != null && amplitude != null) {
+        return SweepDataPoint(degree: degree, amplitude: amplitude);
       }
     }
+
+    return null;
   }
 
-  /// Parse CSV file and extract degree + amplitude data
-  /// Expected columns: azimuth_steps or elevation_steps, amplitude_dB or Amplitude_Smoothed_dB
-  Future<void> _parseCSVFile(File file, {required bool isAzimuth}) async {
-    try {
-      final lines = await file.readAsLines();
-      if (lines.isEmpty) {
-        throw Exception('CSV file is empty');
-      }
-
-      // Parse header to find column indices
-      final header = lines[0].toLowerCase().split(',');
-      int degreeColIndex = -1;
-      int amplitudeColIndex = -1;
-
-      for (int i = 0; i < header.length; i++) {
-        final col = header[i].trim();
-        // Look for degree columns
-        if (col.contains('azimuth') ||
-            col.contains('elevation') ||
-            col.contains('degree') ||
-            col.contains('steps')) {
-          if (isAzimuth && (col.contains('azimuth') || degreeColIndex == -1)) {
-            degreeColIndex = i;
-          } else if (!isAzimuth &&
-              (col.contains('elevation') || degreeColIndex == -1)) {
-            degreeColIndex = i;
-          }
-        }
-        // Look for amplitude columns - prefer smoothed
-        if (col.contains('smoothed') || col.contains('amplitude')) {
-          if (col.contains('smoothed') || amplitudeColIndex == -1) {
-            amplitudeColIndex = i;
-          }
-        }
-      }
-
-      if (degreeColIndex == -1 || amplitudeColIndex == -1) {
-        throw Exception(
-          'Could not find required columns (degree and amplitude) in CSV',
-        );
-      }
-
-      final dataPoints = <SweepDataPoint>[];
-      double maxAmplitude = -100.0;
-      double maxDegree = 0.0;
-
-      // Parse data rows
-      for (int i = 1; i < lines.length; i++) {
-        final parts = lines[i].split(',');
-        if (parts.length > max(degreeColIndex, amplitudeColIndex)) {
-          final degree = double.tryParse(parts[degreeColIndex].trim());
-          final amplitude = double.tryParse(parts[amplitudeColIndex].trim());
-
-          if (degree != null && amplitude != null) {
-            dataPoints.add(
-              SweepDataPoint(degree: degree, amplitude: amplitude),
-            );
-            if (amplitude > maxAmplitude) {
-              maxAmplitude = amplitude;
-              maxDegree = degree;
-            }
-          }
-        }
-      }
-
-      if (dataPoints.isEmpty) {
-        throw Exception('No valid data points found in CSV');
-      }
-
-      setState(() {
-        if (isAzimuth) {
-          _azimuthSweepData.clear();
-          _azimuthSweepData.addAll(dataPoints);
-          _azimuthMaxSweepRSL = maxAmplitude;
-          _azimuthMaxSweepDegree = maxDegree;
-          _azimuthDataLoaded = true;
-          _azimuthPhase = AzimuthPhase.sweepComplete;
-          _calculateAzimuthDegreesToMax();
-        } else {
-          _elevationSweepData.clear();
-          _elevationSweepData.addAll(dataPoints);
-          _elevationMaxSweepRSL = maxAmplitude;
-          _elevationMaxSweepDegree = maxDegree;
-          _elevationDataLoaded = true;
-          _elevationPhase = ElevationPhase.sweepComplete;
-          _calculateElevationDegreesToMax();
-        }
-      });
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Loaded ${dataPoints.length} data points. Peak amplitude: ${maxAmplitude.toStringAsFixed(1)} dBm at ${maxDegree.toStringAsFixed(1)} deg',
-            ),
-            backgroundColor: kThemeBurgundy,
-          ),
-        );
-      }
-    } catch (e) {
-      debugPrint('Error parsing CSV: $e');
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error parsing CSV: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
+  String? _extractString(Map<String, dynamic> data, List<String> keys) {
+    for (final key in keys) {
+      final value = data[key];
+      if (value is String && value.trim().isNotEmpty) {
+        return value.trim();
       }
     }
+    return null;
+  }
+
+  double? _extractDouble(Map<String, dynamic> data, List<String> keys) {
+    for (final key in keys) {
+      final value = data[key];
+      final parsed = _toDouble(value);
+      if (parsed != null) {
+        return parsed;
+      }
+    }
+    return null;
+  }
+
+  double? _toDouble(dynamic value) {
+    if (value is num) {
+      return value.toDouble();
+    }
+    if (value is String) {
+      return double.tryParse(value.trim());
+    }
+    return null;
   }
 
   /// Calculate degrees to rotate to reach peak amplitude for azimuth
@@ -651,7 +609,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Microwave Signal Alignment - Side $_currentSide'),
+        title: const Text('Microwave Signal Alignment'),
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
         actions: [
@@ -915,7 +873,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       ),
                       const SizedBox(height: 10),
                       Text(
-                        'Both Side 1 and Side 2 antennas have been aligned successfully.',
+                        'Single-side antenna alignment has been completed successfully.',
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(color: Colors.white70, height: 1.3),
                         textAlign: TextAlign.center,
@@ -939,7 +897,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                             const SizedBox(width: 12),
                             Expanded(
                               child: Text(
-                                'Disconnect from Side 2 antenna',
+                                'Disconnect from the antenna',
                                 style: Theme.of(context).textTheme.titleSmall
                                     ?.copyWith(
                                       color: Colors.white,
@@ -965,7 +923,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
     if (_azimuthPhase == AzimuthPhase.sweepInProgress) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Azimuth Sweep - Side $_currentSide'),
+          title: const Text('Azimuth Sweep'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
         ),
@@ -982,6 +940,16 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       child: SizedBox(
                         height: 320,
                         child: _buildIncomingSignalGraph(),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: _buildLiveSweepGuidance(
+                        axisName: 'Azimuth',
+                        stepsTaken: _azimuthSweepData.length,
+                        degreesToPeak: _azimuthDegreesToMaxRSL,
+                        peakAmplitude: _azimuthMaxSweepRSL,
+                        peakDegree: _azimuthMaxSweepDegree,
                       ),
                     ),
                     _buildVnaDataPanel(
@@ -1014,9 +982,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       ],
                       actions: [
                         ElevatedButton.icon(
-                          onPressed: _loadAzimuthCSV,
-                          icon: const Icon(Icons.upload_file),
-                          label: const Text('Load Alignment CSV'),
+                          onPressed: _completeSweep,
+                          icon: const Icon(Icons.stop_circle_outlined),
+                          label: const Text('Stop Sweep'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: kThemeBurgundy,
                             foregroundColor: Colors.white,
@@ -1040,7 +1008,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
     if (_azimuthPhase == AzimuthPhase.sweepComplete) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Azimuth Alignment - Side $_currentSide'),
+          title: const Text('Azimuth Alignment'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
         ),
@@ -1053,19 +1021,13 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (!_azimuthDataLoaded)
-                        _buildCsvRequiredCard(
-                          axisName: 'Azimuth',
-                          onLoad: _loadAzimuthCSV,
-                        )
-                      else
-                        _buildAlignmentPromptCard(
-                          axisName: 'Azimuth',
-                          targetDegree: _azimuthMaxSweepDegree,
-                          degreesToMove: _azimuthDegreesToMaxRSL,
-                          peakAmplitude: _azimuthMaxSweepRSL,
-                          onConfirm: _confirmAzimuthAlignment,
-                        ),
+                      _buildAlignmentPromptCard(
+                        axisName: 'Azimuth',
+                        targetDegree: _azimuthMaxSweepDegree,
+                        degreesToMove: _azimuthDegreesToMaxRSL,
+                        peakAmplitude: _azimuthMaxSweepRSL,
+                        onConfirm: _confirmAzimuthAlignment,
+                      ),
                     ],
                   ),
                 ),
@@ -1083,7 +1045,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
     if (_elevationPhase == ElevationPhase.sweepInProgress) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Elevation Sweep - Side $_currentSide'),
+          title: const Text('Elevation Sweep'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
         ),
@@ -1100,6 +1062,17 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       child: SizedBox(
                         height: 320,
                         child: _buildIncomingSignalGraph(),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                      child: _buildLiveSweepGuidance(
+                        axisName: 'Elevation',
+                        stepsTaken: _elevationSweepData.length,
+                        degreesToPeak: _elevationDegreesToMaxRSL,
+                        peakAmplitude: _elevationMaxSweepRSL,
+                        peakDegree: _elevationMaxSweepDegree,
+                        isVertical: true,
                       ),
                     ),
                     _buildVnaDataPanel(
@@ -1132,9 +1105,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       ],
                       actions: [
                         ElevatedButton.icon(
-                          onPressed: _loadElevationCSV,
-                          icon: const Icon(Icons.upload_file),
-                          label: const Text('Load Alignment CSV'),
+                          onPressed: _completeElevationSweep,
+                          icon: const Icon(Icons.stop_circle_outlined),
+                          label: const Text('Stop Sweep'),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: kThemeBurgundy,
                             foregroundColor: Colors.white,
@@ -1158,7 +1131,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
     if (_elevationPhase == ElevationPhase.sweepComplete) {
       return Scaffold(
         appBar: AppBar(
-          title: Text('Elevation Alignment - Side $_currentSide'),
+          title: const Text('Elevation Alignment'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
         ),
@@ -1171,20 +1144,14 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (!_elevationDataLoaded)
-                        _buildCsvRequiredCard(
-                          axisName: 'Elevation',
-                          onLoad: _loadElevationCSV,
-                        )
-                      else
-                        _buildAlignmentPromptCard(
-                          axisName: 'Elevation',
-                          targetDegree: _elevationMaxSweepDegree,
-                          degreesToMove: _elevationDegreesToMaxRSL,
-                          peakAmplitude: _elevationMaxSweepRSL,
-                          onConfirm: _confirmElevationAlignment,
-                          isVertical: true,
-                        ),
+                      _buildAlignmentPromptCard(
+                        axisName: 'Elevation',
+                        targetDegree: _elevationMaxSweepDegree,
+                        degreesToMove: _elevationDegreesToMaxRSL,
+                        peakAmplitude: _elevationMaxSweepRSL,
+                        onConfirm: _confirmElevationAlignment,
+                        isVertical: true,
+                      ),
                     ],
                   ),
                 ),
@@ -1196,6 +1163,67 @@ class _AlignmentPageState extends State<AlignmentPage> {
     }
 
     return const SizedBox.shrink();
+  }
+
+  Widget _buildLiveSweepGuidance({
+    required String axisName,
+    required int stepsTaken,
+    required double degreesToPeak,
+    required double peakAmplitude,
+    required double peakDegree,
+    bool isVertical = false,
+  }) {
+    final hasPeak = stepsTaken > 1;
+    final closeToPeak = degreesToPeak.abs() < 0.2;
+    final direction = degreesToPeak < 0
+        ? (isVertical ? 'DOWN' : 'LEFT')
+        : (isVertical ? 'UP' : 'RIGHT');
+
+    final message = !hasPeak
+        ? 'Sweep the motor to search for the highest amplitude.'
+        : closeToPeak
+        ? 'Highest amplitude found. Stop sweep now; you are already at the peak position.'
+        : 'Highest amplitude found. Stop sweep and go back $direction ${degreesToPeak.abs().toStringAsFixed(1)} deg.';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: kThemeBurgundyLight,
+        border: Border.all(color: kThemeBurgundy),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '$axisName Sweep Guidance',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: kThemeBurgundyDark,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: kThemeBurgundyDark,
+              height: 1.35,
+            ),
+          ),
+          if (hasPeak) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Peak amplitude so far: ${peakAmplitude.toStringAsFixed(1)} dBm at ${peakDegree.toStringAsFixed(1)} deg',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.black87,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Widget _buildIncomingSignalGraph() {
@@ -1231,51 +1259,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 maxRSL: _maxRSL,
               ),
               size: Size.infinite,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCsvRequiredCard({
-    required String axisName,
-    required VoidCallback onLoad,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: kThemeNavyLight,
-        border: Border.all(color: kThemeNavy),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$axisName Alignment Data Required',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: kThemeNavyDark,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            'Run the external program to generate the CSV file, then load it to receive the motor movement instruction.',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: kThemeNavyDark,
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: onLoad,
-            icon: const Icon(Icons.upload_file),
-            label: Text('Load $axisName CSV'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kThemeBurgundy,
-              foregroundColor: Colors.white,
             ),
           ),
         ],
@@ -1798,7 +1781,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _elevationPhase = ElevationPhase.sweepInProgress;
       _elevationSweepData.clear();
       _elevationMaxSweepRSL = -100.0;
-      _elevationDataLoaded = false;
     });
     _sendStartSweep('elevation');
   }
@@ -1809,7 +1791,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _azimuthPhase = AzimuthPhase.sweepInProgress;
       _azimuthSweepData.clear();
       _azimuthMaxSweepRSL = -100.0;
-      _azimuthDataLoaded = false;
     });
     _sendStartSweep('azimuth');
   }
@@ -1817,6 +1798,14 @@ class _AlignmentPageState extends State<AlignmentPage> {
   void _completeSweep() {
     _sendStopSweep();
     setState(() {
+      if (_azimuthSweepData.isEmpty) {
+        _azimuthSweepData.add(
+          SweepDataPoint(degree: _azimuthCurrentDegree, amplitude: _currentRSL),
+        );
+        _azimuthMaxSweepRSL = _currentRSL;
+        _azimuthMaxSweepDegree = _azimuthCurrentDegree;
+      }
+      _calculateAzimuthDegreesToMax();
       _azimuthPhase = AzimuthPhase.sweepComplete;
     });
   }
@@ -1854,8 +1843,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
   }
 
   void _confirmAzimuthAlignment() {
-    // Data should already be loaded from CSV
+    // Alignment uses real-time sweep data
     if (_azimuthSweepData.isNotEmpty) {
+      _calculateAzimuthDegreesToMax();
       setState(() {
         _azimuthPhase = AzimuthPhase.aligned;
         _azimuthConfirmed = true;
@@ -1872,67 +1862,70 @@ class _AlignmentPageState extends State<AlignmentPage> {
           _startElevationSweep();
         },
       );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No sweep data received yet. Continue sweeping, then press Stop Sweep.',
+          ),
+        ),
+      );
     }
   }
 
   void _completeElevationSweep() {
     _sendStopSweep();
     setState(() {
+      if (_elevationSweepData.isEmpty) {
+        _elevationSweepData.add(
+          SweepDataPoint(
+            degree: _elevationCurrentDegree,
+            amplitude: _currentRSL,
+          ),
+        );
+        _elevationMaxSweepRSL = _currentRSL;
+        _elevationMaxSweepDegree = _elevationCurrentDegree;
+      }
+      _calculateElevationDegreesToMax();
       _elevationPhase = ElevationPhase.sweepComplete;
     });
   }
 
   void _confirmElevationAlignment() {
-    // Data should already be loaded from CSV
+    // Alignment uses real-time sweep data
     if (_elevationSweepData.isNotEmpty) {
-      if (_currentSide == 1) {
-        // Side 1 complete - proceed to side 2
-        setState(() {
-          _elevationPhase = ElevationPhase.aligned;
-          _elevationConfirmed = true;
-          _side1Complete = true;
-        });
+      _calculateElevationDegreesToMax();
+      setState(() {
+        _elevationPhase = ElevationPhase.aligned;
+        _elevationConfirmed = true;
+        _processCompleted = true;
+        _currentStep = AlignmentStep.finalized;
+      });
 
-        _showSideCompleteDialog(
-          title: 'Side 1 Alignment Complete',
-          message:
-              'Side 1 azimuth and elevation alignment is complete.\n\n'
-              'Target elevation: ${_elevationMaxSweepDegree.toStringAsFixed(1)} deg (rotate ${_elevationDegreesToMaxRSL.abs().toStringAsFixed(1)} deg ${_elevationDegreesToMaxRSL < 0 ? "DOWN" : "UP"}).',
-          disconnectMessage: 'Please DISCONNECT from Side 1 antenna now.',
-          nextAction:
-              'Connect to Side 2 antenna and tap "Continue" to proceed.',
-          showStartNewAlignment: true,
-          onConfirm: () {
-            Navigator.pop(context);
-            _startSide2();
-          },
-          onStartNew: () {
-            Navigator.pop(context);
-            _resetAlignment();
-          },
-        );
-      } else {
-        // Side 2 complete - all done
-        setState(() {
-          _elevationPhase = ElevationPhase.aligned;
-          _elevationConfirmed = true;
-          _processCompleted = true;
-          _currentStep = AlignmentStep.finalized;
-        });
-
-        _showSideCompleteDialog(
-          title: 'Alignment Finalized',
-          message:
-              'Side 2 azimuth and elevation alignment is complete.\n\n'
-              'Target elevation: ${_elevationMaxSweepDegree.toStringAsFixed(1)}° (rotate ${_elevationDegreesToMaxRSL.abs().toStringAsFixed(1)}° ${_elevationDegreesToMaxRSL < 0 ? "DOWN" : "UP"}).',
-          disconnectMessage: 'Please DISCONNECT from Side 2 antenna now.',
-          nextAction: 'Both antennas are now fully aligned!',
-          showStartNewAlignment: false,
-          onConfirm: () {
-            Navigator.pop(context);
-          },
-        );
-      }
+      _showSideCompleteDialog(
+        title: 'Alignment Finalized',
+        message:
+            'Azimuth and elevation alignment is complete.\n\n'
+            'Target elevation: ${_elevationMaxSweepDegree.toStringAsFixed(1)} deg (rotate ${_elevationDegreesToMaxRSL.abs().toStringAsFixed(1)} deg ${_elevationDegreesToMaxRSL < 0 ? "DOWN" : "UP"}).',
+        disconnectMessage: 'Please disconnect from the antenna now.',
+        nextAction: 'Single-side alignment is complete.',
+        showStartNewAlignment: true,
+        onConfirm: () {
+          Navigator.pop(context);
+        },
+        onStartNew: () {
+          Navigator.pop(context);
+          _resetAlignment();
+        },
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No sweep data received yet. Continue sweeping, then press Stop Sweep.',
+          ),
+        ),
+      );
     }
   }
 
@@ -1947,7 +1940,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _azimuthDegreesToMaxRSL = 0.0;
       _azimuthConfirmed = false;
       _isRecordingAzimuth = false;
-      _azimuthDataLoaded = false;
       // Reset elevation state for side 2
       _elevationPhase = ElevationPhase.waitingForStart;
       _elevationSweepData.clear();
@@ -1956,7 +1948,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _elevationDegreesToMaxRSL = 0.0;
       _elevationConfirmed = false;
       _isRecordingElevation = false;
-      _elevationDataLoaded = false;
       // Reset step
       _currentStep = AlignmentStep.azimuth;
     });
@@ -2107,7 +2098,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _azimuthDegreesToMaxRSL = 0.0;
       _azimuthConfirmed = false;
       _isRecordingAzimuth = false;
-      _azimuthDataLoaded = false;
 
       // Reset elevation state
       _elevationPhase = ElevationPhase.waitingForStart;
@@ -2117,7 +2107,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _elevationDegreesToMaxRSL = 0.0;
       _elevationConfirmed = false;
       _isRecordingElevation = false;
-      _elevationDataLoaded = false;
     });
 
     _sendStartSweep('azimuth');

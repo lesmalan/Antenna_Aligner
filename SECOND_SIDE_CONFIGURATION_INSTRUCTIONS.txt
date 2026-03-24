@@ -1,0 +1,63 @@
+SECOND SIDE CONFIGURATION IMPLEMENTATION GUIDE
+============================================
+
+Current state
+-------------
+The app is intentionally configured for single-side alignment only.
+It finalizes after one azimuth + elevation alignment cycle.
+
+Goal
+----
+Add support for a second side alignment pass (Side 2) after Side 1 is complete.
+
+Implementation steps
+--------------------
+1) Re-enable side-tracking flow in lib/main.dart
+   - Use _currentSide (1 or 2) as the active side identifier.
+   - Use _side1Complete to indicate Side 1 has finished.
+   - Keep _processCompleted false after Side 1 so Side 2 can begin.
+
+2) Restore branching in _confirmElevationAlignment()
+   - If _currentSide == 1:
+     - Mark side 1 complete.
+     - Show completion dialog that instructs operator to disconnect Side 1 and move to Side 2.
+     - On continue, call _startSide2().
+   - Else (_currentSide == 2):
+     - Finalize process (_processCompleted = true, _currentStep = finalized).
+     - Show final completion dialog.
+
+3) Use _startSide2() to reset sweep state for side 2
+   - Set _currentSide = 2.
+   - Reset azimuth/elevation sweep data and max-amplitude tracking values.
+   - Reset confirmation flags.
+   - Set _currentStep = azimuth.
+   - Send START_SWEEP for azimuth.
+
+4) Update UI text to be side-aware
+   - AppBar titles should include side number (for example, "Azimuth Sweep - Side 2").
+   - Finalized screen text should indicate both sides are complete only after Side 2 finishes.
+   - Side transition dialog should include clear disconnect/reconnect instructions.
+
+5) Keep real-time-only data path
+   - Do not reintroduce CSV fallback.
+   - Continue using WebSocket sweep data and sweep_status events.
+
+Backend expectations for side 2
+-------------------------------
+1) Motor controller/service should allow a new sweep cycle after Side 1 is done.
+2) Side switch can be operator-driven in app (through _startSide2()) or backend-driven.
+3) Real-time sweep_point and completed events should continue exactly as for Side 1.
+
+Validation checklist
+--------------------
+1) Side 1 azimuth -> side 1 elevation -> side transition dialog appears.
+2) Continue starts Side 2 azimuth automatically.
+3) Side 2 azimuth -> side 2 elevation -> finalized screen appears.
+4) "Start New Alignment" resets to Side 1 and begins azimuth sweep again.
+5) No CSV references are reintroduced.
+
+Suggested future cleanup
+------------------------
+If multi-side support becomes permanent, consider extracting side-specific state into a model:
+- SideAlignmentState(sideId, azimuthData, elevationData, maxAmplitude, confirmed)
+This will simplify scaling beyond two sides and reduce UI branching complexity.
