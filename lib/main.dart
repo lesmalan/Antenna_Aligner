@@ -117,6 +117,19 @@ class _AlignmentPageState extends State<AlignmentPage> {
 
   bool _isConnecting = false;
 
+  // Live-feed debug + gating controls
+  bool _showDebugPanel = false;
+  final bool _realVnaOnly = true;
+  String _lastPacketSource = 'unknown';
+  String _lastSweepType = '-';
+  String _lastSweepStatus = '-';
+  String _lastAmplitudeField = '-';
+  double? _lastParsedAmplitude;
+  bool _lastAmplitudeApplied = false;
+  int _packetCounter = 0;
+  String _lastPacketKeys = '-';
+  DateTime? _lastPacketAt;
+
   @override
   void initState() {
     super.initState();
@@ -251,16 +264,22 @@ class _AlignmentPageState extends State<AlignmentPage> {
 
   void _applyIncomingPacket(Map<String, dynamic> data) {
     _isConnected = true;
-    _connectionStatus = 'Connected';
 
-    // Keep initial flow behavior: sweep starts once link is live.
-    if (_azimuthPhase == AzimuthPhase.waitingForConnection) {
-      _azimuthPhase = AzimuthPhase.sweepInProgress;
-      _azimuthSweepData.clear();
-      _azimuthMaxSweepRSL = -100.0;
-    }
+    final source =
+        _extractString(data, ['source', 'data_source'])?.toLowerCase() ??
+        'unknown';
+    final isRealVnaPacket = source == 'vna';
+    final allowAmplitudeFromPacket = !_realVnaOnly || isRealVnaPacket;
 
-    final amplitude = _extractDouble(data, [
+    _packetCounter += 1;
+    _lastPacketSource = source;
+    _lastPacketKeys = data.keys.join(', ');
+    _lastPacketAt = DateTime.now();
+    _connectionStatus = allowAmplitudeFromPacket
+        ? 'Connected (real VNA feed)'
+        : 'Connected - waiting for real VNA feed';
+
+    final amplitudeEntry = _extractDoubleWithKey(data, [
       'rsl',
       'amplitude',
       'amplitude_db',
@@ -269,8 +288,20 @@ class _AlignmentPageState extends State<AlignmentPage> {
       'signal_db',
       'level',
     ]);
-    if (amplitude != null) {
-      _currentRSL = amplitude;
+    _lastAmplitudeField = amplitudeEntry?.key ?? '-';
+    _lastParsedAmplitude = amplitudeEntry?.value;
+    _lastAmplitudeApplied = false;
+
+    // Keep initial flow behavior: sweep starts once link is live.
+    if (_azimuthPhase == AzimuthPhase.waitingForConnection) {
+      _azimuthPhase = AzimuthPhase.sweepInProgress;
+      _azimuthSweepData.clear();
+      _azimuthMaxSweepRSL = -100.0;
+    }
+
+    if (amplitudeEntry != null && allowAmplitudeFromPacket) {
+      _currentRSL = amplitudeEntry.value;
+      _lastAmplitudeApplied = true;
     }
 
     final azimuth = _extractDouble(data, [
@@ -300,18 +331,25 @@ class _AlignmentPageState extends State<AlignmentPage> {
       'sweep_axis',
       'axis',
     ])?.toLowerCase();
+    _lastSweepType = sweepType ?? '-';
+
+    final sweepStatus = _extractString(data, ['sweep_status'])?.toLowerCase();
+    _lastSweepStatus = sweepStatus ?? '-';
 
     final isSweepActive =
         data['sweep_active'] == true || data['sweep_status'] == 'started';
 
-    if (isSweepActive) {
+    if (isSweepActive && allowAmplitudeFromPacket) {
       final point = _extractSweepPoint(data['sweep_point'], sweepType);
       if (point != null) {
+        _currentRSL = point.amplitude;
+        _lastParsedAmplitude = point.amplitude;
+        _lastAmplitudeField = 'sweep_point.amplitude';
+        _lastAmplitudeApplied = true;
         _applyLiveSweepPoint(sweepType, point);
       }
     }
 
-    final sweepStatus = _extractString(data, ['sweep_status'])?.toLowerCase();
     if (sweepStatus == 'started') {
       if (sweepType == 'azimuth') {
         _azimuthPhase = AzimuthPhase.sweepInProgress;
@@ -326,11 +364,17 @@ class _AlignmentPageState extends State<AlignmentPage> {
     }
 
     if (sweepStatus == 'completed') {
-      _applyCompletedSweepData(sweepType, data['sweep_data']);
+      _applyCompletedSweepData(
+        sweepType,
+        data['sweep_data'],
+        allowAmplitude: allowAmplitudeFromPacket,
+      );
     }
 
     // Fallback sampling mode if no structured sweep points are sent.
-    if (_isRecordingAzimuth && _azimuthPhase == AzimuthPhase.sweepInProgress) {
+    if (allowAmplitudeFromPacket &&
+        _isRecordingAzimuth &&
+        _azimuthPhase == AzimuthPhase.sweepInProgress) {
       _azimuthSweepData.add(
         SweepDataPoint(degree: _azimuthCurrentDegree, amplitude: _currentRSL),
       );
@@ -340,7 +384,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
       }
     }
 
-    if (_isRecordingElevation &&
+    if (allowAmplitudeFromPacket &&
+        _isRecordingElevation &&
         _elevationPhase == ElevationPhase.sweepInProgress) {
       _elevationSweepData.add(
         SweepDataPoint(degree: _elevationCurrentDegree, amplitude: _currentRSL),
@@ -416,7 +461,15 @@ class _AlignmentPageState extends State<AlignmentPage> {
     }
   }
 
-  void _applyCompletedSweepData(String? sweepType, dynamic rawSweepData) {
+  void _applyCompletedSweepData(
+    String? sweepType,
+    dynamic rawSweepData, {
+    required bool allowAmplitude,
+  }) {
+    if (!allowAmplitude) {
+      return;
+    }
+
     final points = <SweepDataPoint>[];
     if (rawSweepData is List) {
       for (final raw in rawSweepData) {
@@ -432,6 +485,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
         _azimuthSweepData
           ..clear()
           ..addAll(points);
+        _currentRSL = points.last.amplitude;
         _azimuthMaxSweepRSL = -100.0;
         for (final point in points) {
           if (point.amplitude > _azimuthMaxSweepRSL) {
@@ -449,6 +503,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
         _elevationSweepData
           ..clear()
           ..addAll(points);
+        _currentRSL = points.last.amplitude;
         _elevationMaxSweepRSL = -100.0;
         for (final point in points) {
           if (point.amplitude > _elevationMaxSweepRSL) {
@@ -533,14 +588,107 @@ class _AlignmentPageState extends State<AlignmentPage> {
     return null;
   }
 
+  MapEntry<String, double>? _extractDoubleWithKey(
+    Map<String, dynamic> data,
+    List<String> keys,
+  ) {
+    for (final key in keys) {
+      final value = data[key];
+      final parsed = _toDouble(value);
+      if (parsed != null) {
+        return MapEntry(key, parsed);
+      }
+    }
+    return null;
+  }
+
   double? _toDouble(dynamic value) {
     if (value is num) {
       return value.toDouble();
     }
     if (value is String) {
-      return double.tryParse(value.trim());
+      final trimmed = value.trim();
+      final direct = double.tryParse(trimmed);
+      if (direct != null) {
+        return direct;
+      }
+
+      // Accept values like "-23.4 dBm" or "amp=-23.4".
+      final match = RegExp(r'-?\d+(?:\.\d+)?').firstMatch(trimmed);
+      if (match != null) {
+        return double.tryParse(match.group(0)!);
+      }
     }
     return null;
+  }
+
+  void _toggleDebugPanel() {
+    setState(() {
+      _showDebugPanel = !_showDebugPanel;
+    });
+  }
+
+  Widget _buildDebugToggleAction() {
+    return IconButton(
+      tooltip: _showDebugPanel
+          ? 'Hide Live Feed Debug'
+          : 'Show Live Feed Debug',
+      icon: Icon(
+        _showDebugPanel ? Icons.bug_report : Icons.bug_report_outlined,
+      ),
+      onPressed: _toggleDebugPanel,
+    );
+  }
+
+  Widget _buildLiveFeedDebugPanel() {
+    if (!_showDebugPanel) {
+      return const SizedBox.shrink();
+    }
+
+    final timeText = _lastPacketAt == null
+        ? 'never'
+        : _lastPacketAt!.toIso8601String().substring(11, 19);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: kThemeNavyLight,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: kThemeNavy.withValues(alpha: 0.35)),
+        ),
+        child: DefaultTextStyle(
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall!.copyWith(color: kThemeNavyDark, height: 1.3),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Live Feed Debug',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: kThemeNavyDark,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'realVnaOnly=$_realVnaOnly | source=$_lastPacketSource | packets=$_packetCounter | last=$timeText',
+              ),
+              Text(
+                'ampField=$_lastAmplitudeField | parsed=${_lastParsedAmplitude?.toStringAsFixed(2) ?? '-'} | applied=$_lastAmplitudeApplied | current=${_currentRSL.toStringAsFixed(2)} dBm',
+              ),
+              Text('sweepType=$_lastSweepType | sweepStatus=$_lastSweepStatus'),
+              Text(
+                'keys=${_lastPacketKeys.length > 120 ? '${_lastPacketKeys.substring(0, 120)}...' : _lastPacketKeys}',
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// Calculate degrees to rotate to reach peak amplitude for azimuth
@@ -636,6 +784,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
               ),
             ),
           ),
+          _buildDebugToggleAction(),
           IconButton(
             tooltip: 'Support Helpline',
             icon: const Icon(Icons.phone_in_talk),
@@ -671,6 +820,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
                           padding: EdgeInsets.symmetric(horizontal: 16),
                           child: Divider(thickness: 2),
                         ),
+
+                        _buildLiveFeedDebugPanel(),
 
                         // Alignment Information Section
                         _buildAlignmentInfoSection(),
@@ -926,6 +1077,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           title: const Text('Azimuth Sweep'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
+          actions: [_buildDebugToggleAction()],
         ),
         body: SafeArea(
           child: SingleChildScrollView(
@@ -952,6 +1104,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                         peakDegree: _azimuthMaxSweepDegree,
                       ),
                     ),
+                    _buildLiveFeedDebugPanel(),
                     _buildVnaDataPanel(
                       title: 'Live Telemetry',
                       subtitle:
@@ -1011,6 +1164,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           title: const Text('Azimuth Alignment'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
+          actions: [_buildDebugToggleAction()],
         ),
         body: SafeArea(
           child: Column(
@@ -1021,6 +1175,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      _buildLiveFeedDebugPanel(),
                       _buildAlignmentPromptCard(
                         axisName: 'Azimuth',
                         targetDegree: _azimuthMaxSweepDegree,
@@ -1048,6 +1203,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           title: const Text('Elevation Sweep'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
+          actions: [_buildDebugToggleAction()],
         ),
         body: SafeArea(
           child: SingleChildScrollView(
@@ -1075,6 +1231,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                         isVertical: true,
                       ),
                     ),
+                    _buildLiveFeedDebugPanel(),
                     _buildVnaDataPanel(
                       title: 'Live Telemetry',
                       subtitle:
@@ -1134,6 +1291,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           title: const Text('Elevation Alignment'),
           backgroundColor: Theme.of(context).colorScheme.primary,
           foregroundColor: Colors.white,
+          actions: [_buildDebugToggleAction()],
         ),
         body: SafeArea(
           child: Column(
@@ -1144,6 +1302,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      _buildLiveFeedDebugPanel(),
                       _buildAlignmentPromptCard(
                         axisName: 'Elevation',
                         targetDegree: _elevationMaxSweepDegree,
