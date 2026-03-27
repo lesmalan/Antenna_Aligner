@@ -1435,26 +1435,27 @@ class _AlignmentPageState extends State<AlignmentPage> {
                           'Showing only the required incoming measurements for alignment.',
                       metrics: [
                         _buildVnaMetricTile(
-                          icon: Icons.download_rounded,
-                          label: 'Received Amplitude',
-                          value:
-                              '${(_azimuthSweepData.isNotEmpty ? _azimuthSweepData.last.amplitude : _currentAmplitude).toStringAsFixed(1)} dBm',
-                          accentColor: kThemeNavy,
-                          supportingText: 'Latest value from incoming data',
-                        ),
-                        _buildVnaMetricTile(
-                          icon: Icons.settings_ethernet_rounded,
-                          label: 'Motor Steps Taken',
-                          value: '${_azimuthSweepData.length}',
-                          accentColor: kThemeBurgundy,
-                          supportingText: 'Step count from received samples',
-                        ),
-                        _buildVnaMetricTile(
                           icon: Icons.sensors_rounded,
                           label: 'Current Amplitude',
                           value: '${_currentAmplitude.toStringAsFixed(1)} dBm',
-                          accentColor: Theme.of(context).colorScheme.primary,
-                          supportingText: 'Live reading right now',
+                          accentColor: kThemeNavy,
+                          supportingText: 'Live reading from VNA',
+                        ),
+                        _buildVnaMetricTile(
+                          icon: Icons.settings_ethernet_rounded,
+                          label: 'Steps Taken',
+                          value: '${_azimuthSweepData.length}',
+                          accentColor: kThemeBurgundy,
+                          supportingText: 'Samples collected during sweep',
+                        ),
+                        _buildVnaMetricTile(
+                          icon: Icons.arrow_upward_rounded,
+                          label: 'Peak Amplitude',
+                          value: _azimuthSweepData.isEmpty
+                              ? '--'
+                              : '${_azimuthMaxSweepAmplitude.toStringAsFixed(1)} dBm',
+                          accentColor: Colors.green[700]!,
+                          supportingText: 'Highest received during sweep',
                         ),
                       ],
                       actions: [
@@ -1562,26 +1563,27 @@ class _AlignmentPageState extends State<AlignmentPage> {
                           'Showing only the required incoming measurements for alignment.',
                       metrics: [
                         _buildVnaMetricTile(
-                          icon: Icons.download_rounded,
-                          label: 'Received Amplitude',
-                          value:
-                              '${(_elevationSweepData.isNotEmpty ? _elevationSweepData.last.amplitude : _currentAmplitude).toStringAsFixed(1)} dBm',
-                          accentColor: kThemeNavy,
-                          supportingText: 'Latest value from incoming data',
-                        ),
-                        _buildVnaMetricTile(
-                          icon: Icons.settings_ethernet_rounded,
-                          label: 'Motor Steps Taken',
-                          value: '${_elevationSweepData.length}',
-                          accentColor: kThemeBurgundy,
-                          supportingText: 'Step count from received samples',
-                        ),
-                        _buildVnaMetricTile(
                           icon: Icons.sensors_rounded,
                           label: 'Current Amplitude',
                           value: '${_currentAmplitude.toStringAsFixed(1)} dBm',
-                          accentColor: Theme.of(context).colorScheme.primary,
-                          supportingText: 'Live reading right now',
+                          accentColor: kThemeNavy,
+                          supportingText: 'Live reading from VNA',
+                        ),
+                        _buildVnaMetricTile(
+                          icon: Icons.settings_ethernet_rounded,
+                          label: 'Steps Taken',
+                          value: '${_elevationSweepData.length}',
+                          accentColor: kThemeBurgundy,
+                          supportingText: 'Samples collected during sweep',
+                        ),
+                        _buildVnaMetricTile(
+                          icon: Icons.arrow_upward_rounded,
+                          label: 'Peak Amplitude',
+                          value: _elevationSweepData.isEmpty
+                              ? '--'
+                              : '${_elevationMaxSweepAmplitude.toStringAsFixed(1)} dBm',
+                          accentColor: Colors.green[700]!,
+                          supportingText: 'Highest received during sweep',
                         ),
                       ],
                       actions: [
