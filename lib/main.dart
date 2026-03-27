@@ -115,7 +115,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
 
   // Live-feed debug + gating controls
   bool _showDebugPanel = false;
-  final bool _realVnaOnly = true;
+  final bool _realVnaOnly = false;
   String _lastPacketSource = 'unknown';
   String _lastSweepType = '-';
   String _lastSweepStatus = '-';
@@ -261,29 +261,29 @@ class _AlignmentPageState extends State<AlignmentPage> {
   void _applyIncomingPacket(Map<String, dynamic> data) {
     _isConnected = true;
 
-    final source =
-        _extractString(data, ['source', 'data_source'])?.toLowerCase() ??
-        'unknown';
+    // Some servers wrap the actual reading in a nested payload object.
+    final nestedPayload = data['data'] ?? data['payload'] ?? data['message'];
+    if (nestedPayload is Map) {
+      data = {...data, ...Map<String, dynamic>.from(nestedPayload)};
+    }
+
+    final sourceValue = _extractString(data, ['source', 'data_source']);
+    final source = sourceValue?.toLowerCase() ?? 'unknown';
     final isRealVnaPacket = source == 'vna';
-    final allowAmplitudeFromPacket = !_realVnaOnly || isRealVnaPacket;
+    final allowAmplitudeFromPacket =
+        !_realVnaOnly || isRealVnaPacket || sourceValue == null;
 
     _packetCounter += 1;
     _lastPacketSource = source;
     _lastPacketKeys = data.keys.join(', ');
     _lastPacketAt = DateTime.now();
     _connectionStatus = allowAmplitudeFromPacket
-        ? 'Connected (real VNA feed)'
+        ? (isRealVnaPacket
+              ? 'Connected (real VNA feed)'
+              : 'Connected (stream active)')
         : 'Connected - waiting for real VNA feed';
 
-    final amplitudeEntry = _extractDoubleWithKey(data, [
-      'rsl',
-      'amplitude',
-      'amplitude_db',
-      'amplitude_dB',
-      'signal',
-      'signal_db',
-      'level',
-    ]);
+    final amplitudeEntry = _extractBestAmplitudeWithKey(data);
     _lastAmplitudeField = amplitudeEntry?.key ?? '-';
     _lastParsedAmplitude = amplitudeEntry?.value;
     _lastAmplitudeApplied = false;
@@ -306,6 +306,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
       'azimuth',
       'current_azimuth',
       'azimuth_position',
+      'motor_azimuth',
+      'azimuth_steps',
       'az',
     ]);
     if (azimuth != null) {
@@ -318,6 +320,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
       'elevation',
       'current_elevation',
       'elevation_position',
+      'motor_elevation',
+      'elevation_steps',
       'el',
     ]);
     if (elevation != null) {
@@ -366,6 +370,12 @@ class _AlignmentPageState extends State<AlignmentPage> {
       }
     }
 
+    final azElFromText = _extractAzElFromStatusText(data);
+    if (azElFromText != null) {
+      _azimuthCurrentDegree = azElFromText.$1;
+      _elevationCurrentDegree = azElFromText.$2;
+    }
+
     final sweepType = _extractString(data, [
       'sweep_type',
       'sweep_axis',
@@ -409,6 +419,43 @@ class _AlignmentPageState extends State<AlignmentPage> {
         data['sweep_data'],
         allowAmplitude: allowAmplitudeFromPacket,
       );
+
+      // Accept server-provided final position/peak values even without sweep_data.
+      final finalPositionPayload =
+          data['final_position'] ??
+          data['target_position'] ??
+          data['peak_position'] ??
+          data['best_position'];
+      _applyFinalPositionPayload(finalPositionPayload);
+
+      final finalAzimuthDegree = _extractDouble(data, [
+        'final_azimuth_degree',
+        'azimuth_final_degree',
+        'best_azimuth_degree',
+        'azimuth_peak_degree',
+      ]);
+      if (finalAzimuthDegree != null) {
+        _azimuthMaxSweepDegree = finalAzimuthDegree;
+      }
+
+      final finalElevationDegree = _extractDouble(data, [
+        'final_elevation_degree',
+        'elevation_final_degree',
+        'best_elevation_degree',
+        'elevation_peak_degree',
+      ]);
+      if (finalElevationDegree != null) {
+        _elevationMaxSweepDegree = finalElevationDegree;
+      }
+
+      final finalAmplitude = _extractDouble(data, [
+        'final_amplitude',
+        'peak_amplitude',
+        'best_amplitude',
+      ]);
+      if (finalAmplitude != null && allowAmplitudeFromPacket) {
+        _currentRSL = finalAmplitude;
+      }
     }
 
     // Fallback sampling mode if no structured sweep points are sent.
@@ -510,9 +557,26 @@ class _AlignmentPageState extends State<AlignmentPage> {
       return;
     }
 
+    dynamic sweepDataPayload = rawSweepData;
+    if (rawSweepData is Map) {
+      final sweepDataMap = Map<String, dynamic>.from(rawSweepData);
+      sweepDataPayload =
+          sweepDataMap['points'] ??
+          sweepDataMap['sweep_points'] ??
+          sweepDataMap['data'] ??
+          rawSweepData;
+
+      final nestedFinalPosition =
+          sweepDataMap['final_position'] ??
+          sweepDataMap['target_position'] ??
+          sweepDataMap['peak_position'] ??
+          sweepDataMap['best_position'];
+      _applyFinalPositionPayload(nestedFinalPosition);
+    }
+
     final points = <SweepDataPoint>[];
-    if (rawSweepData is List) {
-      for (final raw in rawSweepData) {
+    if (sweepDataPayload is List) {
+      for (final raw in sweepDataPayload) {
         final parsedPoint = _extractSweepPoint(raw, sweepType);
         if (parsedPoint != null) {
           points.add(parsedPoint);
@@ -555,6 +619,44 @@ class _AlignmentPageState extends State<AlignmentPage> {
       if (_elevationSweepData.isNotEmpty) {
         _elevationPhase = ElevationPhase.sweepComplete;
         _calculateElevationDegreesToMax();
+      }
+    }
+  }
+
+  void _applyFinalPositionPayload(dynamic rawPosition) {
+    if (rawPosition is Map) {
+      final position = Map<String, dynamic>.from(rawPosition);
+      final az = _extractDouble(position, [
+        'azimuth_degree',
+        'azimuth_deg',
+        'azimuth',
+        'az',
+        'x',
+      ]);
+      final el = _extractDouble(position, [
+        'elevation_degree',
+        'elevation_deg',
+        'elevation',
+        'el',
+        'y',
+      ]);
+      if (az != null) {
+        _azimuthCurrentDegree = az;
+      }
+      if (el != null) {
+        _elevationCurrentDegree = el;
+      }
+      return;
+    }
+
+    if (rawPosition is List && rawPosition.length >= 2) {
+      final az = _toDouble(rawPosition[0]);
+      final el = _toDouble(rawPosition[1]);
+      if (az != null) {
+        _azimuthCurrentDegree = az;
+      }
+      if (el != null) {
+        _elevationCurrentDegree = el;
       }
     }
   }
@@ -639,6 +741,106 @@ class _AlignmentPageState extends State<AlignmentPage> {
         return MapEntry(key, parsed);
       }
     }
+    return null;
+  }
+
+  MapEntry<String, double>? _extractBestAmplitudeWithKey(
+    Map<String, dynamic> data,
+  ) {
+    const preferredAmplitudeKeys = [
+      'amplitude',
+      'amp',
+      'amplitude_db',
+      'amplitude_dB',
+      'amplitude_raw',
+      'amplitude_smoothed',
+      'smoothed_amplitude',
+      'signal',
+      'signal_db',
+      'signal_strength',
+      'power',
+      'db',
+      'dbm',
+      'value',
+    ];
+
+    const fallbackAmplitudeKeys = ['rsl', 'rssi', 'rx_level'];
+
+    final preferred = _extractDoubleWithKeyDeep(data, preferredAmplitudeKeys);
+    final fallback = _extractDoubleWithKeyDeep(data, fallbackAmplitudeKeys);
+
+    if (preferred != null && fallback != null) {
+      // If the fallback looks like a low-level RSSI value but an explicit
+      // amplitude key is present, trust the explicit key.
+      if (fallback.value <= -60.0 && preferred.value > -60.0) {
+        return preferred;
+      }
+      // If both exist and are materially different, explicit amplitude wins.
+      if ((preferred.value - fallback.value).abs() >= 10.0) {
+        return preferred;
+      }
+      return preferred;
+    }
+
+    return preferred ?? fallback;
+  }
+
+  MapEntry<String, double>? _extractDoubleWithKeyDeep(
+    Map<String, dynamic> data,
+    List<String> keys,
+  ) {
+    final topLevel = _extractDoubleWithKey(data, keys);
+    if (topLevel != null) {
+      return topLevel;
+    }
+
+    for (final entry in data.entries) {
+      final value = entry.value;
+      if (value is Map) {
+        final nested = _extractDoubleWithKey(
+          Map<String, dynamic>.from(value),
+          keys,
+        );
+        if (nested != null) {
+          return MapEntry('${entry.key}.${nested.key}', nested.value);
+        }
+      }
+    }
+
+    return null;
+  }
+
+  (double, double)? _extractAzElFromStatusText(Map<String, dynamic> data) {
+    final candidates = [
+      data['status'],
+      data['motor_status'],
+      data['position_text'],
+      data['message'],
+      data['position'],
+      data['motor_position'],
+    ];
+
+    for (final candidate in candidates) {
+      if (candidate is! String) {
+        continue;
+      }
+
+      final azMatch = RegExp(
+        r'(?:AZ|azimuth)\s*[=:]\s*(-?\d+(?:\.\d+)?)',
+      ).firstMatch(candidate);
+      final elMatch = RegExp(
+        r'(?:EL|elevation)\s*[=:]\s*(-?\d+(?:\.\d+)?)',
+      ).firstMatch(candidate);
+
+      if (azMatch != null && elMatch != null) {
+        final az = double.tryParse(azMatch.group(1)!);
+        final el = double.tryParse(elMatch.group(1)!);
+        if (az != null && el != null) {
+          return (az, el);
+        }
+      }
+    }
+
     return null;
   }
 

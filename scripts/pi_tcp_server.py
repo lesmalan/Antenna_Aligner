@@ -47,6 +47,11 @@ import threading        # Background job cleanup
 import time
 from typing import Dict, Set, Tuple
 
+try:
+    import serial
+except ImportError:
+    serial = None
+
 # WebSocket library (optional but recommended)
 try:
     import websockets
@@ -68,6 +73,56 @@ JOBS: Dict[int, Tuple[subprocess.Popen, str]] = {}
 # WebSocket client tracking: Set of active websocket connections
 # Used for broadcasting signal data to all connected Flutter apps
 WS_CLIENTS: Set = set()
+
+# Optional motor position tracking for WebSocket payloads
+MOTOR_PORT = "/dev/ttyACM0"
+motor_serial = None
+current_azimuth = 0.0
+current_elevation = 0.0
+
+
+def connect_motor() -> None:
+    """Best-effort connection to Arduino motor controller."""
+    global motor_serial
+    if serial is None:
+        return
+
+    try:
+        motor_serial = serial.Serial(MOTOR_PORT, 115200, timeout=2)
+        time.sleep(2)
+        while motor_serial.in_waiting > 0:
+            motor_serial.readline()
+    except Exception as exc:
+        print(f"Motor controller unavailable: {exc}")
+        motor_serial = None
+
+
+def query_motor_position() -> None:
+    """Query current motor position as AZ/EL degrees if controller is connected."""
+    global current_azimuth, current_elevation, motor_serial
+
+    if motor_serial is None or not motor_serial.is_open:
+        return
+
+    try:
+        motor_serial.write(b"STATUS\n")
+        motor_serial.flush()
+
+        start = time.time()
+        while motor_serial.in_waiting == 0 and (time.time() - start) < 0.3:
+            time.sleep(0.01)
+
+        if motor_serial.in_waiting > 0:
+            response = motor_serial.readline().decode("utf-8").strip()
+            if "AZ" in response and "EL" in response:
+                parts = response.split()
+                for part in parts:
+                    if part.startswith("AZ"):
+                        current_azimuth = float(part.split("=")[1])
+                    elif part.startswith("EL"):
+                        current_elevation = float(part.split("=")[1])
+    except Exception:
+        pass
 
 
 # ==================================================================
@@ -254,13 +309,26 @@ async def broadcast_signal_data():
     
     Update Rate: 2 Hz (every 0.5 seconds)
     """
+    connect_motor()
+
     while True:
         if WS_CLIENTS:
-            # TODO: Replace with real signal data from VNA
-            # Simulated RSL: -85.5 dBm ± 2 dB random variation
+            query_motor_position()
+
+            # Simulated amplitude around low-20 dB range for UI testing.
+            amplitude_value = 22.0 + random.uniform(-3, 3)
+
             data = {
-                "rsl": -85.5 + random.uniform(-2, 2),
-                "timestamp": time.time()
+                "rsl": amplitude_value,
+                "amplitude": amplitude_value,
+                "timestamp": time.time(),
+                "source": "simulated",
+                "azimuth_degree": current_azimuth,
+                "elevation_degree": current_elevation,
+                "positioning": {
+                    "azimuth_degree": current_azimuth,
+                    "elevation_degree": current_elevation,
+                },
             }
             
             # Broadcast to all connected clients
