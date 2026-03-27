@@ -154,9 +154,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
         Uri.parse('ws://192.168.15.192:8000/ws'),
       );
 
-      // Wait for the connection to be ready with a shorter timeout
+      // Wait for the connection to be ready
       await channel.ready.timeout(
-        const Duration(seconds: 3),
+        const Duration(seconds: 10),
         onTimeout: () {
           channel.sink.close();
           throw TimeoutException('Connection timed out');
@@ -1443,11 +1443,11 @@ class _AlignmentPageState extends State<AlignmentPage> {
                           supportingText: 'Live reading from VNA',
                         ),
                         _buildVnaMetricTile(
-                          icon: Icons.settings_ethernet_rounded,
-                          label: 'Steps Taken',
-                          value: '${_azimuthSweepData.length}',
+                          icon: Icons.explore_rounded,
+                          label: 'Current Azimuth',
+                          value: '${_azimuthCurrentDegree.toStringAsFixed(1)}°',
                           accentColor: kThemeBurgundy,
-                          supportingText: 'Samples collected during sweep',
+                          supportingText: 'Live azimuth degree position',
                         ),
                         _buildVnaMetricTile(
                           icon: Icons.arrow_upward_rounded,
@@ -1505,9 +1505,41 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       _buildAlignmentPromptCard(
                         axisName: 'Azimuth',
                         targetDegree: _azimuthMaxSweepDegree,
-                        degreesToMove: _azimuthDegreesToMaxAmplitude,
+                        currentDegree: _azimuthCurrentDegree,
                         peakAmplitude: _azimuthMaxSweepAmplitude,
+                        currentAmplitude: _currentAmplitude,
                         onConfirm: _confirmAzimuthAlignment,
+                      ),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          _buildVnaMetricTile(
+                            icon: Icons.sensors_rounded,
+                            label: 'Current Amplitude',
+                            value: '${_currentAmplitude.toStringAsFixed(1)} dB',
+                            accentColor: kThemeNavy,
+                            supportingText: 'Live reading from VNA',
+                          ),
+                          _buildVnaMetricTile(
+                            icon: Icons.explore_rounded,
+                            label: 'Current Azimuth',
+                            value:
+                                '${_azimuthCurrentDegree.toStringAsFixed(1)}\u00b0',
+                            accentColor: kThemeBurgundy,
+                            supportingText: 'Live azimuth degree position',
+                          ),
+                          _buildVnaMetricTile(
+                            icon: Icons.arrow_upward_rounded,
+                            label: 'Peak Amplitude',
+                            value:
+                                '${_azimuthMaxSweepAmplitude.toStringAsFixed(1)} dB',
+                            accentColor: Colors.green[700]!,
+                            supportingText:
+                                'At ${_azimuthMaxSweepDegree.toStringAsFixed(1)}\u00b0',
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -1571,11 +1603,12 @@ class _AlignmentPageState extends State<AlignmentPage> {
                           supportingText: 'Live reading from VNA',
                         ),
                         _buildVnaMetricTile(
-                          icon: Icons.settings_ethernet_rounded,
-                          label: 'Steps Taken',
-                          value: '${_elevationSweepData.length}',
+                          icon: Icons.explore_rounded,
+                          label: 'Current Elevation',
+                          value:
+                              '${_elevationCurrentDegree.toStringAsFixed(1)}°',
                           accentColor: kThemeBurgundy,
-                          supportingText: 'Samples collected during sweep',
+                          supportingText: 'Live elevation degree position',
                         ),
                         _buildVnaMetricTile(
                           icon: Icons.arrow_upward_rounded,
@@ -1633,10 +1666,42 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       _buildAlignmentPromptCard(
                         axisName: 'Elevation',
                         targetDegree: _elevationMaxSweepDegree,
-                        degreesToMove: _elevationDegreesToMaxAmplitude,
+                        currentDegree: _elevationCurrentDegree,
                         peakAmplitude: _elevationMaxSweepAmplitude,
+                        currentAmplitude: _currentAmplitude,
                         onConfirm: _confirmElevationAlignment,
                         isVertical: true,
+                      ),
+                      const SizedBox(height: 16),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          _buildVnaMetricTile(
+                            icon: Icons.sensors_rounded,
+                            label: 'Current Amplitude',
+                            value: '${_currentAmplitude.toStringAsFixed(1)} dB',
+                            accentColor: kThemeNavy,
+                            supportingText: 'Live reading from VNA',
+                          ),
+                          _buildVnaMetricTile(
+                            icon: Icons.explore_rounded,
+                            label: 'Current Elevation',
+                            value:
+                                '${_elevationCurrentDegree.toStringAsFixed(1)}\u00b0',
+                            accentColor: kThemeBurgundy,
+                            supportingText: 'Live elevation degree position',
+                          ),
+                          _buildVnaMetricTile(
+                            icon: Icons.arrow_upward_rounded,
+                            label: 'Peak Amplitude',
+                            value:
+                                '${_elevationMaxSweepAmplitude.toStringAsFixed(1)} dB',
+                            accentColor: Colors.green[700]!,
+                            supportingText:
+                                'At ${_elevationMaxSweepDegree.toStringAsFixed(1)}\u00b0',
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -1752,63 +1817,215 @@ class _AlignmentPageState extends State<AlignmentPage> {
     );
   }
 
+  /// Tolerance in degrees for position verification.
+  static const double _positionToleranceDeg = 2.0;
+
   Widget _buildAlignmentPromptCard({
     required String axisName,
     required double targetDegree,
-    required double degreesToMove,
+    required double currentDegree,
     required double peakAmplitude,
+    required double currentAmplitude,
     required VoidCallback onConfirm,
     bool isVertical = false,
   }) {
-    final direction = degreesToMove < 0
-        ? (isVertical ? 'DOWN' : 'LEFT')
-        : (isVertical ? 'UP' : 'RIGHT');
+    final delta = targetDegree - currentDegree;
+    final isAtTarget = delta.abs() <= _positionToleranceDeg;
+    final direction = delta < 0
+        ? (isVertical ? 'DOWN' : 'LEFT / CCW')
+        : (isVertical ? 'UP' : 'RIGHT / CW');
 
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: kThemeBurgundyLight,
-        border: Border.all(color: kThemeBurgundy),
+        color: isAtTarget ? Colors.green[50] : kThemeBurgundyLight,
+        border: Border.all(
+          color: isAtTarget ? Colors.green[700]! : kThemeBurgundy,
+          width: isAtTarget ? 2 : 1,
+        ),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '$axisName Alignment Prompt',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              color: kThemeBurgundyDark,
-              fontWeight: FontWeight.bold,
-            ),
+          Row(
+            children: [
+              Icon(
+                isAtTarget ? Icons.check_circle : Icons.gps_not_fixed,
+                color: isAtTarget ? Colors.green[700] : kThemeBurgundyDark,
+                size: 22,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  isAtTarget
+                      ? '$axisName Position Verified'
+                      : 'Move $axisName to Peak',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: isAtTarget ? Colors.green[800] : kThemeBurgundyDark,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
           ),
+          const SizedBox(height: 14),
+
+          // Live position + target row
+          Row(
+            children: [
+              Expanded(
+                child: _buildPositionBox(
+                  label: 'Current Position',
+                  value: '${currentDegree.toStringAsFixed(1)}°',
+                  color: kThemeNavy,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Icon(
+                Icons.arrow_forward_rounded,
+                color: isAtTarget ? Colors.green[700] : kThemeBurgundy,
+                size: 20,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildPositionBox(
+                  label: 'Target Position',
+                  value: '${targetDegree.toStringAsFixed(1)}°',
+                  color: isAtTarget ? Colors.green[700]! : kThemeBurgundy,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Direction instruction
+          if (!isAtTarget) ...[
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: kThemeBurgundy.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    isVertical
+                        ? (delta > 0
+                              ? Icons.arrow_upward
+                              : Icons.arrow_downward)
+                        : (delta > 0 ? Icons.arrow_forward : Icons.arrow_back),
+                    color: kThemeBurgundyDark,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Go $direction ${delta.abs().toStringAsFixed(1)}°',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: kThemeBurgundyDark,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+
+          if (isAtTarget)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.green[100],
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.check, color: Colors.green[800], size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Position is within ±${_positionToleranceDeg.toStringAsFixed(0)}° of target. Ready to confirm.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.green[800],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
           const SizedBox(height: 10),
           Text(
-            'Move the stepper motor $direction ${degreesToMove.abs().toStringAsFixed(1)} deg to reach the peak amplitude.',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-              color: kThemeBurgundyDark,
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Peak amplitude: ${peakAmplitude.toStringAsFixed(1)} dB at ${targetDegree.toStringAsFixed(1)} deg',
+            'Peak amplitude: ${peakAmplitude.toStringAsFixed(1)} dB at ${targetDegree.toStringAsFixed(1)}°',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: Colors.black87),
+          ),
+          Text(
+            'Current amplitude: ${currentAmplitude.toStringAsFixed(1)} dB',
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: Colors.black54),
           ),
           const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: onConfirm,
-              icon: const Icon(Icons.done),
-              label: const Text('Confirm Alignment'),
+              onPressed: isAtTarget ? onConfirm : null,
+              icon: Icon(isAtTarget ? Icons.done : Icons.gps_not_fixed),
+              label: Text(
+                isAtTarget
+                    ? 'Confirm $axisName Alignment'
+                    : 'Move to ${targetDegree.toStringAsFixed(1)}° to confirm',
+              ),
               style: ElevatedButton.styleFrom(
-                backgroundColor: kThemeBurgundy,
+                backgroundColor: isAtTarget ? Colors.green[700] : Colors.grey,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 14),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPositionBox({
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              color: color,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: color,
             ),
           ),
         ],
