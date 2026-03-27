@@ -18,6 +18,7 @@ Will exit with error if VNA cannot be connected.
 """
 import asyncio
 import json
+import re
 import time
 from typing import Optional, Set, Dict, List
 
@@ -55,6 +56,8 @@ vna_instrument = None
 
 # Motor controller settings
 MOTOR_PORT = "/dev/ttyACM0"  # Arduino serial port
+STEPS_PER_REV = 200  # NEMA17: 200 steps/rev = 1.8° per step
+DEGREES_PER_STEP = 360.0 / STEPS_PER_REV  # 1.8°
 motor_serial = None
 current_azimuth = 0.0
 current_elevation = 0.0
@@ -225,7 +228,11 @@ def connect_motor():
 
 
 def query_motor_position():
-    """Query current motor position from Arduino."""
+    """Query current motor position from Arduino.
+    
+    Arduino sends: 'POS AZ:<steps> EL:<steps>'
+    We convert steps to degrees using DEGREES_PER_STEP (1.8° for NEMA17).
+    """
     global current_azimuth, current_elevation, motor_serial
     
     if motor_serial is None or not motor_serial.is_open:
@@ -241,14 +248,14 @@ def query_motor_position():
         
         if motor_serial.in_waiting > 0:
             response = motor_serial.readline().decode('utf-8').strip()
-            # Parse: "AZ=123.45 EL=67.89"
-            if 'AZ' in response and 'EL' in response:
-                parts = response.split()
-                for part in parts:
-                    if part.startswith('AZ'):
-                        current_azimuth = float(part.split('=')[1])
-                    elif part.startswith('EL'):
-                        current_elevation = float(part.split('=')[1])
+            # Parse Arduino format: "POS AZ:<steps> EL:<steps>"
+            az_match = re.search(r'AZ[=:]\s*(-?\d+(?:\.\d+)?)', response)
+            el_match = re.search(r'EL[=:]\s*(-?\d+(?:\.\d+)?)', response)
+            if az_match and el_match:
+                az_steps = float(az_match.group(1))
+                el_steps = float(el_match.group(1))
+                current_azimuth = az_steps * DEGREES_PER_STEP
+                current_elevation = el_steps * DEGREES_PER_STEP
     except Exception:
         pass  # Silent failure
 
