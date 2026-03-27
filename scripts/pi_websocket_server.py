@@ -12,10 +12,12 @@ The Flutter app connects and automatically receives sweep data when the
 real-time monitor motor controls script is running.
 
 Requires: pip install websockets pyvisa pyvisa-py pyserial
+
+NOTE: This server REQUIRES real VNA hardware connection. No simulated data fallback.
+Will exit with error if VNA cannot be connected.
 """
 import asyncio
 import json
-import random
 import time
 from typing import Optional, Set, Dict, List
 
@@ -30,9 +32,9 @@ except ImportError:
 try:
     import pyvisa as visa
 except ImportError:
-    print("Warning: pyvisa not installed. Using simulated data.")
+    print("ERROR: pyvisa not installed. Real VNA data is required.")
     print("Install with: pip install pyvisa pyvisa-py")
-    visa = None
+    exit(1)
 
 try:
     import serial
@@ -135,12 +137,9 @@ async def websocket_handler(websocket):
         print(f"Client disconnected: {websocket.remote_address}")
 
 
-def connect_vna() -> Optional[object]:
-    """Connect to VNA instrument."""
+def connect_vna() -> object:
+    """Connect to VNA instrument. FAILS HARD if connection cannot be established."""
     global vna_instrument
-    if visa is None:
-        print("PyVISA not available, using simulated data")
-        return None
     
     try:
         rm = visa.ResourceManager("@py")
@@ -165,18 +164,17 @@ def connect_vna() -> Optional[object]:
         print(f"Connected to VNA: {idn.strip()}")
         return inst
     except Exception as e:
-        print(f"Failed to connect to VNA at {VNA_IP}:{VNA_PORT} - {e}")
-        print("Falling back to simulated data")
-        return None
+        print(f"FATAL ERROR: Failed to connect to VNA at {VNA_IP}:{VNA_PORT} - {e}")
+        print("Real VNA data is required. Cannot proceed with simulated data.")
+        exit(1)
 
 
 def get_vna_reading() -> float:
-    """Get single amplitude reading from VNA."""
+    """Get single amplitude reading from VNA. FAILS if VNA data unavailable."""
     global vna_instrument
     
     if vna_instrument is None:
-        # Simulated data
-        return -85.5 + random.uniform(-2, 2)
+        raise RuntimeError("VNA instrument not connected. Cannot provide simulated data.")
     
     try:
         vna_instrument.write("INIT")
@@ -185,9 +183,8 @@ def get_vna_reading() -> float:
         amplitude = float(data_str.strip().split(",")[0])
         return amplitude
     except Exception as e:
-        print(f"Error reading from VNA: {e}")
-        # Return simulated value on error
-        return -85.5 + random.uniform(-2, 2)
+        print(f"FATAL ERROR: Failed to read from VNA: {e}")
+        raise RuntimeError(f"VNA read error: {e}. No fallback simulated data available.")
 
 
 def connect_motor():
@@ -265,14 +262,14 @@ async def broadcast_signal_data():
             # Query motor position
             query_motor_position()
             
-            # Get real or simulated RSL data
+            # Get real VNA data (only source of truth)
             rsl_value = get_vna_reading()
             
-            # Build data packet
+            # Build data packet (all data is from real VNA)
             data = {
                 "rsl": rsl_value,
+                "amplitude": rsl_value,
                 "timestamp": time.time(),
-                "source": "vna" if vna_instrument else "simulated",
                 "azimuth_degree": current_azimuth,
                 "elevation_degree": current_elevation
             }
