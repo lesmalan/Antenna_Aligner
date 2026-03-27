@@ -1,3 +1,49 @@
+Real-Time Motor Position Logging and Degree Display Updates - 03/25/26
+======================================================================
+
+1. Fixed Motor Position Logging in Real-Time Monitor CSV
+   - Root cause identified: backend monitor process could not reliably own the same serial port while GUI was connected
+   - Implemented shared position handoff between GUI and backend monitor
+   - GUI now writes latest motor position to `/tmp/antenna_aligner_motor_pos.txt`
+   - Backend monitor reads that shared file each measurement cycle and logs current pointing position
+   - Result: CSV now tracks current antenna position alongside amplitude data during live monitoring
+
+2. Improved Motor Command Reliability in GUI
+   - Increased motor command response timeout from 1.0s to 5.0s
+   - Reduces false timeout errors during longer motor moves
+   - Added configurable timeout variable (`self.motor_command_timeout_s`) for easier tuning
+
+3. Added Default Runtime Motor Speed Command on Connect
+   - GUI now sends `SPEED 15` after successful controller connection
+   - Helps improve elevation-axis reliability without requiring firmware edits
+   - Speed response is printed to debug output for visibility
+
+4. Switched User-Facing Position Display to Degrees
+   - Added step-to-degree conversion in both GUI and live monitor backend
+   - GUI position labels changed to `Az (deg)` and `El (deg)`
+   - Home calibration dialogs now display azimuth/elevation in degrees
+   - Live monitor value panel and console output now show degree values
+
+5. Updated CSV Motor Columns to Degree Units
+   - Backend CSV header updated to `Azimuth_deg,Elevation_deg`
+   - Motor step values are converted to degrees before writing each row
+   - Maintains existing amplitude logging format and timestamp behavior
+
+6. Enhanced Manual Movement Feedback
+   - Manual/absolute movement status now reports both units
+   - Examples: `+5 steps (+9.0 deg)` and `-5 steps (-9.0 deg)`
+   - Improves operator clarity while preserving step-based command control
+
+7. Elevation Limit Label Alignment
+   - GUI limit warning is displayed in degree units (`-36.0 to +36.0 deg`)
+   - This reflects current firmware limits of `-20` to `+20` steps
+
+8. Firmware Preference Respected
+   - Firmware edits were not retained per request
+   - Arduino controller file remains unchanged from user-preferred baseline limits/speed
+   - All operational improvements were implemented on the Python/GUI side
+
+
 Real-Time Monitor with Motor Control Integration - 03/11/26
 ============================================================
 

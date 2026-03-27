@@ -14,6 +14,9 @@ import sys
 import time
 from datetime import datetime
 
+STEPS_PER_REV = 200
+DEGREES_PER_STEP = 360.0 / STEPS_PER_REV
+
 # Serial communication for motor controller
 try:
     import serial
@@ -28,6 +31,8 @@ class RealtimeMonitorMotorGUI:
         self.root = root
         self.root.title("ZNLE6 Real-Time Monitor with Motor Controls")
         self.root.geometry("650x700")
+        self.motor_command_timeout_s = 5.0
+        self.default_motor_speed_rpm = 15
         
         # Default parameters - VNA
         self.ip = tk.StringVar(value="192.168.15.90")
@@ -44,6 +49,8 @@ class RealtimeMonitorMotorGUI:
         self.motor_baudrate = tk.IntVar(value=115200)
         self.current_az = tk.IntVar(value=0)
         self.current_el = tk.IntVar(value=0)
+        self.current_az_deg = tk.StringVar(value="0.0")
+        self.current_el_deg = tk.StringVar(value="0.0")
         self.manual_az_step = tk.IntVar(value=10)
         self.manual_el_step = tk.IntVar(value=5)
         
@@ -131,11 +138,11 @@ class RealtimeMonitorMotorGUI:
         pos_display_frame = ttk.Frame(manual_frame)
         pos_display_frame.grid(row=0, column=0, columnspan=4, pady=5)
         
-        ttk.Label(pos_display_frame, text="Az:", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=2)
-        ttk.Label(pos_display_frame, textvariable=self.current_az, 
+        ttk.Label(pos_display_frame, text="Az (deg):", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=2)
+        ttk.Label(pos_display_frame, textvariable=self.current_az_deg, 
                  font=("Arial", 12), foreground="green").pack(side=tk.LEFT, padx=5)
-        ttk.Label(pos_display_frame, text="El:", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=(15,2))
-        ttk.Label(pos_display_frame, textvariable=self.current_el, 
+        ttk.Label(pos_display_frame, text="El (deg):", font=("Arial", 10, "bold")).pack(side=tk.LEFT, padx=(15,2))
+        ttk.Label(pos_display_frame, textvariable=self.current_el_deg, 
                  font=("Arial", 12), foreground="blue").pack(side=tk.LEFT, padx=5)
         
         # Azimuth controls
@@ -164,7 +171,7 @@ class RealtimeMonitorMotorGUI:
         ttk.Button(manual_frame, text="Set Current as Home", 
                   command=self.set_current_as_home).grid(row=4, column=0, columnspan=4, pady=5, sticky=(tk.W, tk.E))
         
-        ttk.Label(manual_frame, text="⚠ Elevation limits: -20 to +20", 
+        ttk.Label(manual_frame, text="Elevation limits: -36.0 to +36.0 deg", 
                  foreground="red", font=('Arial', 8)).grid(row=5, column=0, columnspan=4, pady=(2, 0))
         
         # TODO: Motor Control Settings (for future TCP/IP motor controllers)
@@ -462,6 +469,8 @@ class RealtimeMonitorMotorGUI:
                 self.motor_connected = True
                 self.root.after(0, self.connection_success, port)
                 self.root.after(100, self.update_motor_position)
+                speed_response = self.send_motor_command(f"SPEED {self.default_motor_speed_rpm}")
+                print(f"[Motor] Speed set response: {speed_response}")
             else:
                 # No valid response
                 raise Exception(f"Arduino not responding properly. Got: {test_response or 'no response'}")
@@ -525,7 +534,7 @@ class RealtimeMonitorMotorGUI:
             
             # Wait for response with timeout
             start_time = time.time()
-            while self.motor_ser.in_waiting == 0 and (time.time() - start_time) < 1.0:
+            while self.motor_ser.in_waiting == 0 and (time.time() - start_time) < self.motor_command_timeout_s:
                 time.sleep(0.05)
             
             if self.motor_ser.in_waiting > 0:
@@ -541,6 +550,15 @@ class RealtimeMonitorMotorGUI:
             print(f"[Motor] Communication error: {e}")
             self.status_label.config(text=f"Motor communication error: {e}")
             return None
+
+    def _steps_to_degrees(self, steps):
+        """Convert motor steps to degrees for user-facing display."""
+        return steps * DEGREES_PER_STEP
+
+    def _refresh_degree_display(self):
+        """Refresh displayed azimuth/elevation degree values from internal steps."""
+        self.current_az_deg.set(f"{self._steps_to_degrees(self.current_az.get()):.1f}")
+        self.current_el_deg.set(f"{self._steps_to_degrees(self.current_el.get()):.1f}")
     
     def update_motor_position(self):
         """Query current motor positions."""
@@ -562,6 +580,7 @@ class RealtimeMonitorMotorGUI:
                 
                 self.current_az.set(az)
                 self.current_el.set(el)
+                self._refresh_degree_display()
                 # Write position to shared file so the backend monitor can log it
                 try:
                     with open('/tmp/antenna_aligner_motor_pos.txt', 'w') as f:
@@ -580,7 +599,8 @@ class RealtimeMonitorMotorGUI:
         """Move azimuth to absolute position."""
         response = self.send_motor_command(f"AZABS {target_az}")
         if response and response.startswith("OK"):
-            self.status_label.config(text=f"Moving to azimuth {target_az}")
+            target_az_deg = self._steps_to_degrees(target_az)
+            self.status_label.config(text=f"Moving to azimuth {target_az} steps ({target_az_deg:.1f} deg)")
             # Wait for movement to complete (estimate based on speed)
             time.sleep(0.5)
             self.update_motor_position()
@@ -593,7 +613,8 @@ class RealtimeMonitorMotorGUI:
         """Move elevation to absolute position."""
         response = self.send_motor_command(f"ELABS {target_el}")
         if response and response.startswith("OK"):
-            self.status_label.config(text=f"Moving to elevation {target_el}")
+            target_el_deg = self._steps_to_degrees(target_el)
+            self.status_label.config(text=f"Moving to elevation {target_el} steps ({target_el_deg:.1f} deg)")
             time.sleep(0.5)
             self.update_motor_position()
             return True
@@ -607,14 +628,15 @@ class RealtimeMonitorMotorGUI:
             messagebox.showwarning("Not Connected", "Motor controller not connected")
             return
         
-        print(f"[Motor] Manual move: {axis} by {steps:+d} steps")
+        steps_deg = self._steps_to_degrees(steps)
+        print(f"[Motor] Manual move: {axis} by {steps:+d} steps ({steps_deg:+.1f} deg)")
         
         if axis == 'az':
             response = self.send_motor_command(f"AZ {steps}")
-            self.status_label.config(text=f"Azimuth move: {steps:+d} steps -> {response}")
+            self.status_label.config(text=f"Azimuth move: {steps:+d} steps ({steps_deg:+.1f} deg) -> {response}")
         else:  # elevation
             response = self.send_motor_command(f"EL {steps}")
-            self.status_label.config(text=f"Elevation move: {steps:+d} steps -> {response}")
+            self.status_label.config(text=f"Elevation move: {steps:+d} steps ({steps_deg:+.1f} deg) -> {response}")
         
         if response and response.startswith("OK"):
             # Update position after successful move
@@ -670,14 +692,16 @@ class RealtimeMonitorMotorGUI:
         # Get current position for confirmation message
         current_az = self.current_az.get()
         current_el = self.current_el.get()
+        current_az_deg = self._steps_to_degrees(current_az)
+        current_el_deg = self._steps_to_degrees(current_el)
         
         # Confirm with user
         confirm = messagebox.askyesno(
             "Calibrate Home Position",
             f"Set current position as new home (0, 0)?\\n\\n"
             f"Current Position:\\n"
-            f"  Azimuth: {current_az}°\\n"
-            f"  Elevation: {current_el}°\\n\\n"
+            f"  Azimuth: {current_az_deg:.1f} deg\\n"
+            f"  Elevation: {current_el_deg:.1f} deg\\n\\n"
             f"This will reset the position tracking to zero.\\n"
             f"The 'Home (0,0)' button will return to this position.\\n\\n"
             f"Continue?"
@@ -703,12 +727,13 @@ class RealtimeMonitorMotorGUI:
                 "Home Position Calibrated",
                 f"Home position set successfully via Arduino!\\n\\n"
                 f"Position counters have been reset to (0, 0).\\n"
-                f"Previous coordinates: Az={current_az}°, El={current_el}°\\n\\n"
+                f"Previous coordinates: Az={current_az_deg:.1f} deg, El={current_el_deg:.1f} deg\n\n"
                 f"Use 'Home (0,0)' button to return to this position."
             )
             # Update position display - should now show (0, 0)
             self.current_az.set(0)
             self.current_el.set(0)
+            self._refresh_degree_display()
             self.root.after(100, self.update_motor_position)
             
         else:
@@ -723,13 +748,14 @@ class RealtimeMonitorMotorGUI:
             # Immediately update display to show (0, 0)
             self.current_az.set(0)
             self.current_el.set(0)
+            self._refresh_degree_display()
             
             self.status_label.config(text=f"Home calibrated via software (was Az={current_az}, El={current_el})")
             messagebox.showinfo(
                 "Home Position Calibrated (Software Mode)",
                 f"Home position set successfully!\\n\\n"
                 f"Using software-based tracking (Arduino firmware may be outdated).\\n"
-                f"Position offsets saved: Az={current_az}°, El={current_el}°\\n\\n"
+                f"Position offsets saved: Az={current_az_deg:.1f} deg, El={current_el_deg:.1f} deg\n\n"
                 f"Display now shows (0, 0).\\n"
                 f"Use 'Home (0,0)' button to return to this position.\\n\\n"
                 f"Note: To use hardware mode, upload the latest Arduino sketch from:\\n"

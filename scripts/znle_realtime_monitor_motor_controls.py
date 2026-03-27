@@ -25,6 +25,9 @@ import time
 from datetime import datetime
 from collections import deque
 
+STEPS_PER_REV = 200
+DEGREES_PER_STEP = 360.0 / STEPS_PER_REV
+
 # NumPy for data handling
 try:
     import numpy as np
@@ -189,6 +192,10 @@ class RealtimeMonitorWithMotor:
             self.current_el = int(el_str)
         except Exception:
             pass  # Keep last known position if file missing or unreadable
+
+    def steps_to_degrees(self, steps):
+        """Convert motor steps to degrees for logs and display."""
+        return steps * DEGREES_PER_STEP
     
     def measure_amplitude(self):
         """Perform single measurement and return amplitude"""
@@ -241,7 +248,9 @@ class RealtimeMonitorWithMotor:
             if self.csv_file:
                 timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
                 if self.motor_connected:
-                    self.csv_file.write(f"{timestamp},{elapsed:.3f},{self.target_freq},{amplitude:.3f},{smoothed_amplitude:.3f},{self.current_az:.2f},{self.current_el:.2f}\n")
+                    az_deg = self.steps_to_degrees(self.current_az)
+                    el_deg = self.steps_to_degrees(self.current_el)
+                    self.csv_file.write(f"{timestamp},{elapsed:.3f},{self.target_freq},{amplitude:.3f},{smoothed_amplitude:.3f},{az_deg:.2f},{el_deg:.2f}\n")
                 else:
                     self.csv_file.write(f"{timestamp},{elapsed:.3f},{self.target_freq},{amplitude:.3f},{smoothed_amplitude:.3f}\n")
                 self.csv_file.flush()
@@ -273,13 +282,21 @@ class RealtimeMonitorWithMotor:
             
             # Update value text
             smooth_info = f" (smoothed)" if self.smoothing_window > 1 else ""
-            motor_info = f"\nAz: {self.current_az:.1f}° El: {self.current_el:.1f}°" if self.motor_connected else ""
+            motor_info = ""
+            if self.motor_connected:
+                az_deg = self.steps_to_degrees(self.current_az)
+                el_deg = self.steps_to_degrees(self.current_el)
+                motor_info = f"\nAz: {az_deg:.1f} deg El: {el_deg:.1f} deg"
             self.value_text.set_text(f'Current: {smoothed_amplitude:.2f} dB{smooth_info}\nRaw: {amplitude:.2f} dB\nTime: {elapsed:.1f} s\nPoints: {len(self.times)}{motor_info}')
             
             # Print to console every 10 measurements
             if len(self.times) % 10 == 0:
                 smooth_info = f"  Smoothed={smoothed_amplitude:.2f} dB" if self.smoothing_window > 1 else ""
-                motor_info = f"  Az={self.current_az:.1f}° El={self.current_el:.1f}°" if self.motor_connected else ""
+                motor_info = ""
+                if self.motor_connected:
+                    az_deg = self.steps_to_degrees(self.current_az)
+                    el_deg = self.steps_to_degrees(self.current_el)
+                    motor_info = f"  Az={az_deg:.1f} deg El={el_deg:.1f} deg"
                 print(f"t={elapsed:.1f}s  Raw={amplitude:.2f} dB{smooth_info}{motor_info}  Points={len(self.times)}")
         
         return self.line, self.value_text
