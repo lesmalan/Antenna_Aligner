@@ -1,9 +1,0 @@
-[Desktop Entry]
-Version=1.0
-Type=Application
-Name=Antenna Aligner
-Comment=Combined VNA and Motor Control for Antenna Alignment
-Exec=/home/sd2-group2/Documents/SD2_Codespace/Antenna_Aligner/.venv/bin/python /home/sd2-group2/Documents/SD2_Codespace/Antenna_Aligner/scripts/antenna_aligner_gui.py
-Icon=applications-science
-Terminal=false
-Categories=Science;Education;Engineering;
