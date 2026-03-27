@@ -6,13 +6,13 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 /// Data point from sweep containing degree position and amplitude
 class SweepDataPoint {
   final double degree;
-  final double amplitude; // amplitude in dBm
+  final double amplitude; // amplitude in dB
 
   SweepDataPoint({required this.degree, required this.amplitude});
 
   @override
   String toString() =>
-      'SweepDataPoint(degree: $degree, amplitude: $amplitude dBm)';
+      'SweepDataPoint(degree: $degree, amplitude: $amplitude dB)';
 }
 
 void main() {
@@ -100,8 +100,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
   bool _isRecordingElevation =
       false; // Flag: continuously recording elevation data
 
-  // Signal data from Raspberry Pi
-  double _currentAmplitude = -85.5; // dBm
+  // Signal data from Raspberry Pi (null until first real packet arrives)
+  double _currentAmplitude =
+      -100.0; // dB – sentinel, overwritten by first Pi packet
   double _azimuthDegreesLeft = 0.0; // Degrees to rotate left to reach max
   double _azimuthDegreesRight = 0.0; // Degrees to rotate right to reach max
   double _elevationDegreesUp = 0.0; // Degrees to rotate up to reach max
@@ -868,7 +869,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
         return direct;
       }
 
-      // Accept values like "-23.4 dBm" or "amp=-23.4".
+      // Accept values like "-23.4 dB" or "amp=-23.4".
       final match = RegExp(r'-?\d+(?:\.\d+)?').firstMatch(trimmed);
       if (match != null) {
         return double.tryParse(match.group(0)!);
@@ -933,7 +934,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 'realVnaOnly=$_realVnaOnly | source=$_lastPacketSource | packets=$_packetCounter | last=$timeText',
               ),
               Text(
-                'ampField=$_lastAmplitudeField | parsed=${_lastParsedAmplitude?.toStringAsFixed(2) ?? '-'} | applied=$_lastAmplitudeApplied | current=${_currentAmplitude.toStringAsFixed(2)} dBm',
+                'ampField=$_lastAmplitudeField | parsed=${_lastParsedAmplitude?.toStringAsFixed(2) ?? '-'} | applied=$_lastAmplitudeApplied | current=${_currentAmplitude.toStringAsFixed(2)} dB',
               ),
               Text('sweepType=$_lastSweepType | sweepStatus=$_lastSweepStatus'),
               Text(
@@ -1437,7 +1438,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                         _buildVnaMetricTile(
                           icon: Icons.sensors_rounded,
                           label: 'Current Amplitude',
-                          value: '${_currentAmplitude.toStringAsFixed(1)} dBm',
+                          value: '${_currentAmplitude.toStringAsFixed(1)} dB',
                           accentColor: kThemeNavy,
                           supportingText: 'Live reading from VNA',
                         ),
@@ -1453,7 +1454,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                           label: 'Peak Amplitude',
                           value: _azimuthSweepData.isEmpty
                               ? '--'
-                              : '${_azimuthMaxSweepAmplitude.toStringAsFixed(1)} dBm',
+                              : '${_azimuthMaxSweepAmplitude.toStringAsFixed(1)} dB',
                           accentColor: Colors.green[700]!,
                           supportingText: 'Highest received during sweep',
                         ),
@@ -1565,7 +1566,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                         _buildVnaMetricTile(
                           icon: Icons.sensors_rounded,
                           label: 'Current Amplitude',
-                          value: '${_currentAmplitude.toStringAsFixed(1)} dBm',
+                          value: '${_currentAmplitude.toStringAsFixed(1)} dB',
                           accentColor: kThemeNavy,
                           supportingText: 'Live reading from VNA',
                         ),
@@ -1581,7 +1582,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                           label: 'Peak Amplitude',
                           value: _elevationSweepData.isEmpty
                               ? '--'
-                              : '${_elevationMaxSweepAmplitude.toStringAsFixed(1)} dBm',
+                              : '${_elevationMaxSweepAmplitude.toStringAsFixed(1)} dB',
                           accentColor: Colors.green[700]!,
                           supportingText: 'Highest received during sweep',
                         ),
@@ -1699,7 +1700,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           if (hasPeak) ...[
             const SizedBox(height: 8),
             Text(
-              'Peak amplitude so far: ${peakAmplitude.toStringAsFixed(1)} dBm at ${peakDegree.toStringAsFixed(1)} deg',
+              'Peak amplitude so far: ${peakAmplitude.toStringAsFixed(1)} dB at ${peakDegree.toStringAsFixed(1)} deg',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Colors.black87,
                 fontWeight: FontWeight.w600,
@@ -1791,7 +1792,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Peak amplitude: ${peakAmplitude.toStringAsFixed(1)} dBm at ${targetDegree.toStringAsFixed(1)} deg',
+            'Peak amplitude: ${peakAmplitude.toStringAsFixed(1)} dB at ${targetDegree.toStringAsFixed(1)} deg',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: Colors.black87),
@@ -1971,7 +1972,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
               _buildVnaMetricTile(
                 icon: Icons.graphic_eq_rounded,
                 label: 'Current Amplitude',
-                value: '${_currentAmplitude.toStringAsFixed(1)} dBm',
+                value: '${_currentAmplitude.toStringAsFixed(1)} dB',
                 accentColor: Theme.of(context).colorScheme.primary,
                 supportingText: 'Live receiver reading',
               ),
@@ -1979,7 +1980,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 _buildVnaMetricTile(
                   icon: Icons.flag_rounded,
                   label: 'Best Sweep Peak',
-                  value: '${_bestSweepPeak!.toStringAsFixed(1)} dBm',
+                  value: '${_bestSweepPeak!.toStringAsFixed(1)} dB',
                   accentColor: kThemeBurgundy,
                   supportingText: 'Highest amplitude from sweeps',
                 ),
@@ -2016,7 +2017,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Live amplitude level (dBm)',
+                    'Live amplitude level (dB)',
                     style: Theme.of(
                       context,
                     ).textTheme.bodySmall?.copyWith(color: Colors.grey[600]),

@@ -49,7 +49,7 @@ WS_CLIENTS: Set = set()
 # VNA connection settings
 VNA_IP = "192.168.15.90"
 VNA_PORT = 5025
-VNA_FREQ = 1e9  # 1 GHz
+VNA_FREQ = 977e6  # 977 MHz — matches znle_realtime_monitor_motor_controls.py
 VNA_PARAM = "S21"  # S-parameter to measure
 vna_instrument = None
 
@@ -150,13 +150,13 @@ def connect_vna() -> object:
         rm = visa.ResourceManager("@py")
         resource = f"TCPIP0::{VNA_IP}::{VNA_PORT}::SOCKET"
         inst = rm.open_resource(resource)
-        inst.timeout = 5000
+        inst.timeout = 10000  # 10 second timeout — matches monitor script
         inst.write_termination = "\n"
         inst.read_termination = "\n"
         
-        # Configure for single-point measurement
+        # Configure for single-point measurement (matches znle_realtime_monitor_motor_controls.py)
         inst.write("FORM:DATA ASCii")
-        inst.write("CALC:PAR:PORT 1")
+        inst.write("SENS:AVER OFF")  # Disable averaging for fast measurements
         inst.write(f"CALC:PAR:DEF 'Trc1',{VNA_PARAM}")
         inst.write("CALC:PAR:SEL 'Trc1'")
         inst.write(f"SENS:FREQ:STAR {VNA_FREQ}")
@@ -185,7 +185,7 @@ def get_vna_reading() -> float:
         vna_instrument.write("INIT")
         vna_instrument.query("*OPC?")
         data_str = vna_instrument.query("CALC:DATA? FDATA")
-        amplitude = float(data_str.strip().split(",")[0])
+        amplitude = float(data_str.strip())
         return amplitude
     except Exception as e:
         print(f"FATAL ERROR: Failed to read from VNA: {e}")
