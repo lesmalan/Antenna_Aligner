@@ -79,10 +79,11 @@ class _AlignmentPageState extends State<AlignmentPage> {
   AzimuthPhase _azimuthPhase = AzimuthPhase.waitingForConnection;
   final List<SweepDataPoint> _azimuthSweepData =
       []; // Store all degree+amplitude readings during azimuth sweep
-  double _azimuthMaxSweepRSL = -100.0; // Peak amplitude during azimuth sweep
+  double _azimuthMaxSweepAmplitude =
+      -100.0; // Peak amplitude during azimuth sweep
   double _azimuthMaxSweepDegree = 0.0; // Degree position of peak amplitude
   double _azimuthCurrentDegree = 0.0; // Current azimuth degree position
-  double _azimuthDegreesToMaxRSL =
+  double _azimuthDegreesToMaxAmplitude =
       0.0; // Calculated: degrees to rotate to reach peak amplitude
   bool _isRecordingAzimuth = false; // Flag: continuously recording azimuth data
 
@@ -90,17 +91,17 @@ class _AlignmentPageState extends State<AlignmentPage> {
   ElevationPhase _elevationPhase = ElevationPhase.waitingForStart;
   final List<SweepDataPoint> _elevationSweepData =
       []; // Store all degree+amplitude readings during elevation sweep
-  double _elevationMaxSweepRSL =
+  double _elevationMaxSweepAmplitude =
       -100.0; // Peak amplitude during elevation sweep
   double _elevationMaxSweepDegree = 0.0; // Degree position of peak amplitude
   double _elevationCurrentDegree = 0.0; // Current elevation degree position
-  double _elevationDegreesToMaxRSL =
+  double _elevationDegreesToMaxAmplitude =
       0.0; // Calculated: degrees to rotate to reach peak amplitude
   bool _isRecordingElevation =
       false; // Flag: continuously recording elevation data
 
   // Signal data from Raspberry Pi
-  double _currentRSL = -85.5; // dBm
+  double _currentAmplitude = -85.5; // dBm
   double _azimuthDegreesLeft = 0.0; // Degrees to rotate left to reach max
   double _azimuthDegreesRight = 0.0; // Degrees to rotate right to reach max
   double _elevationDegreesUp = 0.0; // Degrees to rotate up to reach max
@@ -176,7 +177,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
       });
 
       // Send a request to prompt the server to start sending data
-      _channel?.sink.add(jsonEncode({'action': 'start', 'request': 'rsl'}));
+      _channel?.sink.add(
+        jsonEncode({'action': 'start', 'request': 'amplitude'}),
+      );
 
       _channel?.stream.listen(
         (message) {
@@ -292,11 +295,11 @@ class _AlignmentPageState extends State<AlignmentPage> {
     if (_azimuthPhase == AzimuthPhase.waitingForConnection) {
       _azimuthPhase = AzimuthPhase.sweepInProgress;
       _azimuthSweepData.clear();
-      _azimuthMaxSweepRSL = -100.0;
+      _azimuthMaxSweepAmplitude = -100.0;
     }
 
     if (amplitudeEntry != null && allowAmplitudeFromPacket) {
-      _currentRSL = amplitudeEntry.value;
+      _currentAmplitude = amplitudeEntry.value;
       _lastAmplitudeApplied = true;
     }
 
@@ -392,7 +395,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
     if (isSweepActive && allowAmplitudeFromPacket) {
       final point = _extractSweepPoint(data['sweep_point'], sweepType);
       if (point != null) {
-        _currentRSL = point.amplitude;
+        _currentAmplitude = point.amplitude;
         _lastParsedAmplitude = point.amplitude;
         _lastAmplitudeField = 'sweep_point.amplitude';
         _lastAmplitudeApplied = true;
@@ -404,11 +407,11 @@ class _AlignmentPageState extends State<AlignmentPage> {
       if (sweepType == 'azimuth') {
         _azimuthPhase = AzimuthPhase.sweepInProgress;
         _azimuthSweepData.clear();
-        _azimuthMaxSweepRSL = -100.0;
+        _azimuthMaxSweepAmplitude = -100.0;
       } else if (sweepType == 'elevation') {
         _elevationPhase = ElevationPhase.sweepInProgress;
         _elevationSweepData.clear();
-        _elevationMaxSweepRSL = -100.0;
+        _elevationMaxSweepAmplitude = -100.0;
       }
       debugPrint('Pi acknowledged $sweepType sweep start');
     }
@@ -454,7 +457,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
         'best_amplitude',
       ]);
       if (finalAmplitude != null && allowAmplitudeFromPacket) {
-        _currentRSL = finalAmplitude;
+        _currentAmplitude = finalAmplitude;
       }
     }
 
@@ -463,10 +466,13 @@ class _AlignmentPageState extends State<AlignmentPage> {
         _isRecordingAzimuth &&
         _azimuthPhase == AzimuthPhase.sweepInProgress) {
       _azimuthSweepData.add(
-        SweepDataPoint(degree: _azimuthCurrentDegree, amplitude: _currentRSL),
+        SweepDataPoint(
+          degree: _azimuthCurrentDegree,
+          amplitude: _currentAmplitude,
+        ),
       );
-      if (_currentRSL > _azimuthMaxSweepRSL) {
-        _azimuthMaxSweepRSL = _currentRSL;
+      if (_currentAmplitude > _azimuthMaxSweepAmplitude) {
+        _azimuthMaxSweepAmplitude = _currentAmplitude;
         _azimuthMaxSweepDegree = _azimuthCurrentDegree;
       }
     }
@@ -475,10 +481,13 @@ class _AlignmentPageState extends State<AlignmentPage> {
         _isRecordingElevation &&
         _elevationPhase == ElevationPhase.sweepInProgress) {
       _elevationSweepData.add(
-        SweepDataPoint(degree: _elevationCurrentDegree, amplitude: _currentRSL),
+        SweepDataPoint(
+          degree: _elevationCurrentDegree,
+          amplitude: _currentAmplitude,
+        ),
       );
-      if (_currentRSL > _elevationMaxSweepRSL) {
-        _elevationMaxSweepRSL = _currentRSL;
+      if (_currentAmplitude > _elevationMaxSweepAmplitude) {
+        _elevationMaxSweepAmplitude = _currentAmplitude;
         _elevationMaxSweepDegree = _elevationCurrentDegree;
       }
     }
@@ -523,12 +532,12 @@ class _AlignmentPageState extends State<AlignmentPage> {
       if (_azimuthPhase != AzimuthPhase.sweepInProgress) {
         _azimuthPhase = AzimuthPhase.sweepInProgress;
         _azimuthSweepData.clear();
-        _azimuthMaxSweepRSL = -100.0;
+        _azimuthMaxSweepAmplitude = -100.0;
       }
       _azimuthCurrentDegree = point.degree;
       _azimuthSweepData.add(point);
-      if (point.amplitude > _azimuthMaxSweepRSL) {
-        _azimuthMaxSweepRSL = point.amplitude;
+      if (point.amplitude > _azimuthMaxSweepAmplitude) {
+        _azimuthMaxSweepAmplitude = point.amplitude;
         _azimuthMaxSweepDegree = point.degree;
       }
       _calculateAzimuthDegreesToMax();
@@ -536,12 +545,12 @@ class _AlignmentPageState extends State<AlignmentPage> {
       if (_elevationPhase != ElevationPhase.sweepInProgress) {
         _elevationPhase = ElevationPhase.sweepInProgress;
         _elevationSweepData.clear();
-        _elevationMaxSweepRSL = -100.0;
+        _elevationMaxSweepAmplitude = -100.0;
       }
       _elevationCurrentDegree = point.degree;
       _elevationSweepData.add(point);
-      if (point.amplitude > _elevationMaxSweepRSL) {
-        _elevationMaxSweepRSL = point.amplitude;
+      if (point.amplitude > _elevationMaxSweepAmplitude) {
+        _elevationMaxSweepAmplitude = point.amplitude;
         _elevationMaxSweepDegree = point.degree;
       }
       _calculateElevationDegreesToMax();
@@ -589,11 +598,11 @@ class _AlignmentPageState extends State<AlignmentPage> {
         _azimuthSweepData
           ..clear()
           ..addAll(points);
-        _currentRSL = points.last.amplitude;
-        _azimuthMaxSweepRSL = -100.0;
+        _currentAmplitude = points.last.amplitude;
+        _azimuthMaxSweepAmplitude = -100.0;
         for (final point in points) {
-          if (point.amplitude > _azimuthMaxSweepRSL) {
-            _azimuthMaxSweepRSL = point.amplitude;
+          if (point.amplitude > _azimuthMaxSweepAmplitude) {
+            _azimuthMaxSweepAmplitude = point.amplitude;
             _azimuthMaxSweepDegree = point.degree;
           }
         }
@@ -607,11 +616,11 @@ class _AlignmentPageState extends State<AlignmentPage> {
         _elevationSweepData
           ..clear()
           ..addAll(points);
-        _currentRSL = points.last.amplitude;
-        _elevationMaxSweepRSL = -100.0;
+        _currentAmplitude = points.last.amplitude;
+        _elevationMaxSweepAmplitude = -100.0;
         for (final point in points) {
-          if (point.amplitude > _elevationMaxSweepRSL) {
-            _elevationMaxSweepRSL = point.amplitude;
+          if (point.amplitude > _elevationMaxSweepAmplitude) {
+            _elevationMaxSweepAmplitude = point.amplitude;
             _elevationMaxSweepDegree = point.degree;
           }
         }
@@ -764,7 +773,11 @@ class _AlignmentPageState extends State<AlignmentPage> {
       'value',
     ];
 
-    const fallbackAmplitudeKeys = ['rsl', 'rssi', 'rx_level'];
+    const fallbackAmplitudeKeys = [
+      'rsl',
+      'rssi',
+      'rx_level',
+    ]; // Fallback keys if explicit amplitude not found
 
     final preferred = _extractDoubleWithKeyDeep(data, preferredAmplitudeKeys);
     final fallback = _extractDoubleWithKeyDeep(data, fallbackAmplitudeKeys);
@@ -920,7 +933,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                 'realVnaOnly=$_realVnaOnly | source=$_lastPacketSource | packets=$_packetCounter | last=$timeText',
               ),
               Text(
-                'ampField=$_lastAmplitudeField | parsed=${_lastParsedAmplitude?.toStringAsFixed(2) ?? '-'} | applied=$_lastAmplitudeApplied | current=${_currentRSL.toStringAsFixed(2)} dBm',
+                'ampField=$_lastAmplitudeField | parsed=${_lastParsedAmplitude?.toStringAsFixed(2) ?? '-'} | applied=$_lastAmplitudeApplied | current=${_currentAmplitude.toStringAsFixed(2)} dBm',
               ),
               Text('sweepType=$_lastSweepType | sweepStatus=$_lastSweepStatus'),
               Text(
@@ -941,14 +954,14 @@ class _AlignmentPageState extends State<AlignmentPage> {
     final currentDegree = _azimuthCurrentDegree;
     final targetDegree = _azimuthMaxSweepDegree;
 
-    _azimuthDegreesToMaxRSL = targetDegree - currentDegree;
+    _azimuthDegreesToMaxAmplitude = targetDegree - currentDegree;
 
     // Update directional hints
-    if (_azimuthDegreesToMaxRSL > 0) {
-      _azimuthDegreesRight = _azimuthDegreesToMaxRSL;
+    if (_azimuthDegreesToMaxAmplitude > 0) {
+      _azimuthDegreesRight = _azimuthDegreesToMaxAmplitude;
       _azimuthDegreesLeft = 0;
     } else {
-      _azimuthDegreesLeft = _azimuthDegreesToMaxRSL.abs();
+      _azimuthDegreesLeft = _azimuthDegreesToMaxAmplitude.abs();
       _azimuthDegreesRight = 0;
     }
   }
@@ -961,14 +974,14 @@ class _AlignmentPageState extends State<AlignmentPage> {
     final currentDegree = _elevationCurrentDegree;
     final targetDegree = _elevationMaxSweepDegree;
 
-    _elevationDegreesToMaxRSL = targetDegree - currentDegree;
+    _elevationDegreesToMaxAmplitude = targetDegree - currentDegree;
 
     // Update directional hints
-    if (_elevationDegreesToMaxRSL > 0) {
-      _elevationDegreesUp = _elevationDegreesToMaxRSL;
+    if (_elevationDegreesToMaxAmplitude > 0) {
+      _elevationDegreesUp = _elevationDegreesToMaxAmplitude;
       _elevationDegreesDown = 0;
     } else {
-      _elevationDegreesDown = _elevationDegreesToMaxRSL.abs();
+      _elevationDegreesDown = _elevationDegreesToMaxAmplitude.abs();
       _elevationDegreesUp = 0;
     }
   }
@@ -976,8 +989,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
   /// Best amplitude actually observed from sweep data — null until a sweep completes.
   double? get _bestSweepPeak {
     double best = -100.0;
-    if (_azimuthMaxSweepRSL > -100.0) best = _azimuthMaxSweepRSL;
-    if (_elevationMaxSweepRSL > best) best = _elevationMaxSweepRSL;
+    if (_azimuthMaxSweepAmplitude > -100.0) best = _azimuthMaxSweepAmplitude;
+    if (_elevationMaxSweepAmplitude > best) best = _elevationMaxSweepAmplitude;
     return best > -100.0 ? best : null;
   }
 
@@ -1288,6 +1301,47 @@ class _AlignmentPageState extends State<AlignmentPage> {
                           borderRadius: BorderRadius.circular(18),
                           border: Border.all(color: Colors.white24),
                         ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Results',
+                              style: Theme.of(context).textTheme.titleSmall
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Azimuth peak: ${_azimuthMaxSweepDegree.toStringAsFixed(1)}° '
+                              '(${_azimuthDegreesToMaxAmplitude.abs().toStringAsFixed(1)}° ${_azimuthDegreesToMaxAmplitude < 0 ? "LEFT" : "RIGHT"})',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Elevation peak: ${_elevationMaxSweepDegree.toStringAsFixed(1)}° '
+                              '(${_elevationDegreesToMaxAmplitude.abs().toStringAsFixed(1)}° ${_elevationDegreesToMaxAmplitude < 0 ? "DOWN" : "UP"})',
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: Colors.white24),
+                        ),
                         child: Row(
                           children: [
                             const Icon(
@@ -1307,6 +1361,26 @@ class _AlignmentPageState extends State<AlignmentPage> {
                               ),
                             ),
                           ],
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: _resetAlignment,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Start New Alignment'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white.withValues(
+                              alpha: 0.2,
+                            ),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              side: const BorderSide(color: Colors.white24),
+                            ),
+                          ),
                         ),
                       ),
                     ],
@@ -1349,8 +1423,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       child: _buildLiveSweepGuidance(
                         axisName: 'Azimuth',
                         stepsTaken: _azimuthSweepData.length,
-                        degreesToPeak: _azimuthDegreesToMaxRSL,
-                        peakAmplitude: _azimuthMaxSweepRSL,
+                        degreesToPeak: _azimuthDegreesToMaxAmplitude,
+                        peakAmplitude: _azimuthMaxSweepAmplitude,
                         peakDegree: _azimuthMaxSweepDegree,
                       ),
                     ),
@@ -1364,7 +1438,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                           icon: Icons.download_rounded,
                           label: 'Received Amplitude',
                           value:
-                              '${(_azimuthSweepData.isNotEmpty ? _azimuthSweepData.last.amplitude : _currentRSL).toStringAsFixed(1)} dBm',
+                              '${(_azimuthSweepData.isNotEmpty ? _azimuthSweepData.last.amplitude : _currentAmplitude).toStringAsFixed(1)} dBm',
                           accentColor: kThemeNavy,
                           supportingText: 'Latest value from incoming data',
                         ),
@@ -1378,7 +1452,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                         _buildVnaMetricTile(
                           icon: Icons.sensors_rounded,
                           label: 'Current Amplitude',
-                          value: '${_currentRSL.toStringAsFixed(1)} dBm',
+                          value: '${_currentAmplitude.toStringAsFixed(1)} dBm',
                           accentColor: Theme.of(context).colorScheme.primary,
                           supportingText: 'Live reading right now',
                         ),
@@ -1429,8 +1503,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       _buildAlignmentPromptCard(
                         axisName: 'Azimuth',
                         targetDegree: _azimuthMaxSweepDegree,
-                        degreesToMove: _azimuthDegreesToMaxRSL,
-                        peakAmplitude: _azimuthMaxSweepRSL,
+                        degreesToMove: _azimuthDegreesToMaxAmplitude,
+                        peakAmplitude: _azimuthMaxSweepAmplitude,
                         onConfirm: _confirmAzimuthAlignment,
                       ),
                     ],
@@ -1475,8 +1549,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       child: _buildLiveSweepGuidance(
                         axisName: 'Elevation',
                         stepsTaken: _elevationSweepData.length,
-                        degreesToPeak: _elevationDegreesToMaxRSL,
-                        peakAmplitude: _elevationMaxSweepRSL,
+                        degreesToPeak: _elevationDegreesToMaxAmplitude,
+                        peakAmplitude: _elevationMaxSweepAmplitude,
                         peakDegree: _elevationMaxSweepDegree,
                         isVertical: true,
                       ),
@@ -1491,7 +1565,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                           icon: Icons.download_rounded,
                           label: 'Received Amplitude',
                           value:
-                              '${(_elevationSweepData.isNotEmpty ? _elevationSweepData.last.amplitude : _currentRSL).toStringAsFixed(1)} dBm',
+                              '${(_elevationSweepData.isNotEmpty ? _elevationSweepData.last.amplitude : _currentAmplitude).toStringAsFixed(1)} dBm',
                           accentColor: kThemeNavy,
                           supportingText: 'Latest value from incoming data',
                         ),
@@ -1505,7 +1579,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                         _buildVnaMetricTile(
                           icon: Icons.sensors_rounded,
                           label: 'Current Amplitude',
-                          value: '${_currentRSL.toStringAsFixed(1)} dBm',
+                          value: '${_currentAmplitude.toStringAsFixed(1)} dBm',
                           accentColor: Theme.of(context).colorScheme.primary,
                           supportingText: 'Live reading right now',
                         ),
@@ -1556,8 +1630,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       _buildAlignmentPromptCard(
                         axisName: 'Elevation',
                         targetDegree: _elevationMaxSweepDegree,
-                        degreesToMove: _elevationDegreesToMaxRSL,
-                        peakAmplitude: _elevationMaxSweepRSL,
+                        degreesToMove: _elevationDegreesToMaxAmplitude,
+                        peakAmplitude: _elevationMaxSweepAmplitude,
                         onConfirm: _confirmElevationAlignment,
                         isVertical: true,
                       ),
@@ -1664,8 +1738,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
           Expanded(
             child: CustomPaint(
               painter: AmplitudeLevelPainter(
-                currentRSL: _currentRSL,
-                peakRSL: _bestSweepPeak,
+                currentAmplitude: _currentAmplitude,
+                peakAmplitude: _bestSweepPeak,
               ),
               size: Size.infinite,
             ),
@@ -1895,7 +1969,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
               _buildVnaMetricTile(
                 icon: Icons.graphic_eq_rounded,
                 label: 'Current Amplitude',
-                value: '${_currentRSL.toStringAsFixed(1)} dBm',
+                value: '${_currentAmplitude.toStringAsFixed(1)} dBm',
                 accentColor: Theme.of(context).colorScheme.primary,
                 supportingText: 'Live receiver reading',
               ),
@@ -1932,8 +2006,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   Expanded(
                     child: CustomPaint(
                       painter: AmplitudeLevelPainter(
-                        currentRSL: _currentRSL,
-                        peakRSL: _bestSweepPeak,
+                        currentAmplitude: _currentAmplitude,
+                        peakAmplitude: _bestSweepPeak,
                       ),
                       size: Size.infinite,
                     ),
@@ -2128,7 +2202,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
     setState(() {
       _elevationPhase = ElevationPhase.sweepInProgress;
       _elevationSweepData.clear();
-      _elevationMaxSweepRSL = -100.0;
+      _elevationMaxSweepAmplitude = -100.0;
     });
     _sendStartSweep('elevation');
   }
@@ -2138,9 +2212,12 @@ class _AlignmentPageState extends State<AlignmentPage> {
     setState(() {
       if (_azimuthSweepData.isEmpty) {
         _azimuthSweepData.add(
-          SweepDataPoint(degree: _azimuthCurrentDegree, amplitude: _currentRSL),
+          SweepDataPoint(
+            degree: _azimuthCurrentDegree,
+            amplitude: _currentAmplitude,
+          ),
         );
-        _azimuthMaxSweepRSL = _currentRSL;
+        _azimuthMaxSweepAmplitude = _currentAmplitude;
         _azimuthMaxSweepDegree = _azimuthCurrentDegree;
       }
       _calculateAzimuthDegreesToMax();
@@ -2158,16 +2235,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
         _currentStep = AlignmentStep.elevation;
       });
 
-      _showConfirmationDialog(
-        title: 'Azimuth Aligned',
-        message:
-            'Azimuth alignment complete. Target position: ${_azimuthMaxSweepDegree.toStringAsFixed(1)} deg\n\nProceeding to elevation alignment...',
-        onConfirm: () {
-          Navigator.pop(context);
-          // Start elevation sweep after azimuth is confirmed
-          _startElevationSweep();
-        },
-      );
+      // Immediately start elevation sweep after azimuth is confirmed
+      _startElevationSweep();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -2186,10 +2255,10 @@ class _AlignmentPageState extends State<AlignmentPage> {
         _elevationSweepData.add(
           SweepDataPoint(
             degree: _elevationCurrentDegree,
-            amplitude: _currentRSL,
+            amplitude: _currentAmplitude,
           ),
         );
-        _elevationMaxSweepRSL = _currentRSL;
+        _elevationMaxSweepAmplitude = _currentAmplitude;
         _elevationMaxSweepDegree = _elevationCurrentDegree;
       }
       _calculateElevationDegreesToMax();
@@ -2207,23 +2276,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
         _processCompleted = true;
         _currentStep = AlignmentStep.finalized;
       });
-
-      _showSideCompleteDialog(
-        title: 'Alignment Finalized',
-        message:
-            'Azimuth and elevation alignment is complete.\n\n'
-            'Target elevation: ${_elevationMaxSweepDegree.toStringAsFixed(1)} deg (rotate ${_elevationDegreesToMaxRSL.abs().toStringAsFixed(1)} deg ${_elevationDegreesToMaxRSL < 0 ? "DOWN" : "UP"}).',
-        disconnectMessage: 'Please disconnect from the antenna now.',
-        nextAction: 'Single-side alignment is complete.',
-        showStartNewAlignment: true,
-        onConfirm: () {
-          Navigator.pop(context);
-        },
-        onStartNew: () {
-          Navigator.pop(context);
-          _resetAlignment();
-        },
-      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -2235,133 +2287,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
     }
   }
 
-  void _showConfirmationDialog({
-    required String title,
-    required String message,
-    required VoidCallback onConfirm,
-  }) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(title),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: onConfirm,
-            style: ElevatedButton.styleFrom(backgroundColor: kThemeBurgundy),
-            child: const Text('Confirm'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showSideCompleteDialog({
-    required String title,
-    required String message,
-    required String disconnectMessage,
-    required String nextAction,
-    required VoidCallback onConfirm,
-    bool showStartNewAlignment = false,
-    VoidCallback? onStartNew,
-  }) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.check_circle, color: kThemeBurgundy, size: 28),
-            const SizedBox(width: 12),
-            Expanded(child: Text(title)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(message),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: kThemeBurgundyLight,
-                border: Border.all(color: kThemeBurgundy),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.link_off, color: kThemeBurgundy, size: 24),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      disconnectMessage,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: kThemeBurgundyDark,
-                        fontSize: 15,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: kThemeNavyLight,
-                border: Border.all(color: kThemeNavy),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.arrow_forward, color: kThemeNavy, size: 24),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      nextAction,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w500,
-                        color: kThemeNavyDark,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          if (showStartNewAlignment && onStartNew != null)
-            TextButton.icon(
-              onPressed: onStartNew,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Start New Alignment'),
-              style: TextButton.styleFrom(foregroundColor: Colors.grey[700]),
-            ),
-          ElevatedButton.icon(
-            onPressed: onConfirm,
-            icon: const Icon(Icons.check),
-            label: const Text('Continue'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: kThemeBurgundy,
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _resetAlignment() {
     setState(() {
       // Reset all state to start over
@@ -2371,18 +2296,18 @@ class _AlignmentPageState extends State<AlignmentPage> {
       // Reset azimuth state
       _azimuthPhase = AzimuthPhase.sweepInProgress;
       _azimuthSweepData.clear();
-      _azimuthMaxSweepRSL = -100.0;
+      _azimuthMaxSweepAmplitude = -100.0;
       _azimuthMaxSweepDegree = 0.0;
-      _azimuthDegreesToMaxRSL = 0.0;
+      _azimuthDegreesToMaxAmplitude = 0.0;
       _azimuthConfirmed = false;
       _isRecordingAzimuth = false;
 
       // Reset elevation state
       _elevationPhase = ElevationPhase.waitingForStart;
       _elevationSweepData.clear();
-      _elevationMaxSweepRSL = -100.0;
+      _elevationMaxSweepAmplitude = -100.0;
       _elevationMaxSweepDegree = 0.0;
-      _elevationDegreesToMaxRSL = 0.0;
+      _elevationDegreesToMaxAmplitude = 0.0;
       _elevationConfirmed = false;
       _isRecordingElevation = false;
     });
@@ -2428,13 +2353,13 @@ class _AlignmentPageState extends State<AlignmentPage> {
 }
 
 class AmplitudeLevelPainter extends CustomPainter {
-  final double currentRSL;
-  final double? peakRSL;
+  final double currentAmplitude;
+  final double? peakAmplitude;
 
   static const double _minDb = -120.0;
   static const double _maxDb = 0.0;
 
-  AmplitudeLevelPainter({required this.currentRSL, this.peakRSL});
+  AmplitudeLevelPainter({required this.currentAmplitude, this.peakAmplitude});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -2451,8 +2376,8 @@ class AmplitudeLevelPainter extends CustomPainter {
       Paint()..color = Colors.grey[200]!,
     );
 
-    // Filled bar — width proportional to current RSL
-    final clamped = currentRSL.clamp(_minDb, _maxDb);
+    // Filled bar — width proportional to current amplitude.
+    final clamped = currentAmplitude.clamp(_minDb, _maxDb);
     final fraction = (clamped - _minDb) / (_maxDb - _minDb);
     final filledWidth = size.width * fraction;
 
@@ -2483,8 +2408,8 @@ class AmplitudeLevelPainter extends CustomPainter {
     }
 
     // Sweep peak marker (burgundy vertical line)
-    if (peakRSL != null) {
-      final peakClamped = peakRSL!.clamp(_minDb, _maxDb);
+    if (peakAmplitude != null) {
+      final peakClamped = peakAmplitude!.clamp(_minDb, _maxDb);
       final peakX = (peakClamped - _minDb) / (_maxDb - _minDb) * size.width;
       canvas.drawLine(
         Offset(peakX, 0),
@@ -2519,5 +2444,6 @@ class AmplitudeLevelPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(AmplitudeLevelPainter old) =>
-      old.currentRSL != currentRSL || old.peakRSL != peakRSL;
+      old.currentAmplitude != currentAmplitude ||
+      old.peakAmplitude != peakAmplitude;
 }

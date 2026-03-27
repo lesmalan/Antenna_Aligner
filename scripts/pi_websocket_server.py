@@ -83,13 +83,15 @@ async def websocket_handler(websocket):
                     await websocket.send(json.dumps({"response": "PONG"}))
                     
                 elif cmd == "GET_RSL":
-                    # Send current RSL reading
+                    # Send current amplitude reading
                     rsl = get_vna_reading()
                     await websocket.send(json.dumps({
-                        "rsl": rsl, 
+                        "rsl": rsl,
+                        "amplitude": rsl,
                         "timestamp": time.time(),
                         "azimuth_degree": current_azimuth,
-                        "elevation_degree": current_elevation
+                        "elevation_degree": current_elevation,
+                        "source": "vna"
                     }))
                     
                 elif cmd == "START_SWEEP":
@@ -115,12 +117,15 @@ async def websocket_handler(websocket):
                     sweep_data = []
                     
                 elif action == "start":
-                    # Legacy support for initial connection
+                    # Initial connection handshake
+                    reading = get_vna_reading()
                     await websocket.send(json.dumps({
                         "status": "ready",
-                        "rsl": get_vna_reading(),
+                        "rsl": reading,
+                        "amplitude": reading,
                         "azimuth_degree": current_azimuth,
-                        "elevation_degree": current_elevation
+                        "elevation_degree": current_elevation,
+                        "source": "vna"
                     }))
                     
             except json.JSONDecodeError:
@@ -271,7 +276,8 @@ async def broadcast_signal_data():
                 "amplitude": rsl_value,
                 "timestamp": time.time(),
                 "azimuth_degree": current_azimuth,
-                "elevation_degree": current_elevation
+                "elevation_degree": current_elevation,
+                "source": "vna"
             }
             
             # If sweep is active, also include sweep data point
