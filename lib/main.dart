@@ -109,8 +109,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
   AlignmentStep _currentStep = AlignmentStep.azimuth;
   bool _azimuthConfirmed = false;
   bool _elevationConfirmed = false;
-  int _currentSide = 1; // Track which side we're aligning (1 or 2)
-  bool _side1Complete = false; // Track if side 1 alignment is done
   bool _processCompleted = false; // true when the entire process is finalized
 
   bool _isConnecting = false;
@@ -307,6 +305,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
       'azimuth_deg',
       'azimuth',
       'current_azimuth',
+      'azimuth_position',
       'az',
     ]);
     if (azimuth != null) {
@@ -318,10 +317,53 @@ class _AlignmentPageState extends State<AlignmentPage> {
       'elevation_deg',
       'elevation',
       'current_elevation',
+      'elevation_position',
       'el',
     ]);
     if (elevation != null) {
       _elevationCurrentDegree = elevation;
+    }
+
+    final positioningPayload =
+        data['positioning'] ??
+        data['position'] ??
+        data['motor_position'] ??
+        data['motor_positions'];
+    if (positioningPayload is Map) {
+      final positioning = Map<String, dynamic>.from(positioningPayload);
+
+      final azimuthFromPositioning = _extractDouble(positioning, [
+        'azimuth_degree',
+        'azimuth_deg',
+        'azimuth',
+        'current_azimuth',
+        'az',
+        'x',
+      ]);
+      if (azimuthFromPositioning != null) {
+        _azimuthCurrentDegree = azimuthFromPositioning;
+      }
+
+      final elevationFromPositioning = _extractDouble(positioning, [
+        'elevation_degree',
+        'elevation_deg',
+        'elevation',
+        'current_elevation',
+        'el',
+        'y',
+      ]);
+      if (elevationFromPositioning != null) {
+        _elevationCurrentDegree = elevationFromPositioning;
+      }
+    } else if (positioningPayload is List && positioningPayload.length >= 2) {
+      final azimuthFromPositioning = _toDouble(positioningPayload[0]);
+      final elevationFromPositioning = _toDouble(positioningPayload[1]);
+      if (azimuthFromPositioning != null) {
+        _azimuthCurrentDegree = azimuthFromPositioning;
+      }
+      if (elevationFromPositioning != null) {
+        _elevationCurrentDegree = elevationFromPositioning;
+      }
     }
 
     final sweepType = _extractString(data, [
@@ -1495,68 +1537,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
     );
   }
 
-  Widget _buildSweepBanner({
-    required IconData icon,
-    required String title,
-    required String message,
-    required Color accentColor,
-    required Color backgroundColor,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [backgroundColor, Colors.white],
-          ),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: accentColor.withValues(alpha: 0.18)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: accentColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(icon, color: accentColor),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black87,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    message,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Colors.black54,
-                      height: 1.35,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildVnaMetricTile({
     required IconData icon,
     required String label,
@@ -1951,16 +1931,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
     _sendStartSweep('elevation');
   }
 
-  /// Start azimuth sweep - called on connection or when manually restarting
-  void _startAzimuthSweep() {
-    setState(() {
-      _azimuthPhase = AzimuthPhase.sweepInProgress;
-      _azimuthSweepData.clear();
-      _azimuthMaxSweepRSL = -100.0;
-    });
-    _sendStartSweep('azimuth');
-  }
-
   void _completeSweep() {
     _sendStopSweep();
     setState(() {
@@ -1974,38 +1944,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _calculateAzimuthDegreesToMax();
       _azimuthPhase = AzimuthPhase.sweepComplete;
     });
-  }
-
-  void _toggleAzimuthRecording() {
-    setState(() {
-      _isRecordingAzimuth = !_isRecordingAzimuth;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _isRecordingAzimuth
-              ? 'Recording started - rotate the antenna slowly'
-              : 'Recording stopped',
-        ),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-
-  void _toggleElevationRecording() {
-    setState(() {
-      _isRecordingElevation = !_isRecordingElevation;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _isRecordingElevation
-              ? 'Recording started - rotate the antenna slowly'
-              : 'Recording stopped',
-        ),
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 
   void _confirmAzimuthAlignment() {
@@ -2093,32 +2031,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
         ),
       );
     }
-  }
-
-  void _startSide2() {
-    setState(() {
-      _currentSide = 2;
-      // Reset azimuth state for side 2
-      _azimuthPhase = AzimuthPhase.sweepInProgress;
-      _azimuthSweepData.clear();
-      _azimuthMaxSweepRSL = -100.0;
-      _azimuthMaxSweepDegree = 0.0;
-      _azimuthDegreesToMaxRSL = 0.0;
-      _azimuthConfirmed = false;
-      _isRecordingAzimuth = false;
-      // Reset elevation state for side 2
-      _elevationPhase = ElevationPhase.waitingForStart;
-      _elevationSweepData.clear();
-      _elevationMaxSweepRSL = -100.0;
-      _elevationMaxSweepDegree = 0.0;
-      _elevationDegreesToMaxRSL = 0.0;
-      _elevationConfirmed = false;
-      _isRecordingElevation = false;
-      // Reset step
-      _currentStep = AlignmentStep.azimuth;
-    });
-
-    _sendStartSweep('azimuth');
   }
 
   void _showConfirmationDialog({
@@ -2251,8 +2163,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
   void _resetAlignment() {
     setState(() {
       // Reset all state to start over
-      _currentSide = 1;
-      _side1Complete = false;
       _processCompleted = false;
       _currentStep = AlignmentStep.azimuth;
 
