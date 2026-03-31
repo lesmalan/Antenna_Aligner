@@ -1833,7 +1833,13 @@ class _AlignmentPageState extends State<AlignmentPage> {
   }) {
     final delta = targetDegree - currentDegree;
     final isAtTarget = delta.abs() <= _positionToleranceDeg;
-    final direction = delta < 0
+
+    // Direction from origin (0°) to the target
+    final fromOriginDirection = targetDegree < 0
+        ? (isVertical ? 'DOWN' : 'LEFT / CCW')
+        : (isVertical ? 'UP' : 'RIGHT / CW');
+    // Direction the user needs to move NOW (from current position)
+    final moveDirection = delta < 0
         ? (isVertical ? 'DOWN' : 'LEFT / CCW')
         : (isVertical ? 'UP' : 'RIGHT / CW');
 
@@ -1874,6 +1880,37 @@ class _AlignmentPageState extends State<AlignmentPage> {
           ),
           const SizedBox(height: 14),
 
+          // Instruction from origin
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: kThemeNavy.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kThemeNavy.withValues(alpha: 0.15)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Peak found ${targetDegree.abs().toStringAsFixed(1)}° $fromOriginDirection from origin',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: kThemeNavyDark,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Return to ${targetDegree.toStringAsFixed(1)}° to align.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: kThemeNavyDark),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
           // Live position + target row
           Row(
             children: [
@@ -1902,7 +1939,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           ),
           const SizedBox(height: 14),
 
-          // Direction instruction
+          // Remaining distance instruction
           if (!isAtTarget) ...[
             Container(
               width: double.infinity,
@@ -1925,7 +1962,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Go $direction ${delta.abs().toStringAsFixed(1)}°',
+                      'Go $moveDirection ${delta.abs().toStringAsFixed(1)}° to reach target',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: kThemeBurgundyDark,
                         fontWeight: FontWeight.w700,
