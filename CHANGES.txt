@@ -1,3 +1,145 @@
+RSL Controller v01 Enhanced Motor Control - 03/31/26
+=====================================================
+
+1. Absolute Position Control Implementation
+   - Added direct degree-based positioning for azimuth and elevation
+   - New GUI input fields for target position entry
+   - "Go To Az Position" and "Go To El Position" buttons
+   - Position entries support decimal degrees (e.g., 45.5°)
+   - CCW (counter-clockwise) rotation defined as positive for azimuth
+   - Positions calculated relative to home (0°, 0°) reference
+   - Software home offset automatically applied in absolute positioning
+   - Validation ensures elevation targets remain within safe limits
+
+2. Incremental Movement System
+   - All motor movements broken into 2-step increments
+   - Position queried and updated after each 2-step movement
+   - Constant INCREMENTAL_STEP_SIZE = 2 for fine-grained tracking
+   - Progress percentage displayed in status bar during movement
+   - Current position in degrees shown throughout movement
+   - Enables monitoring of signal changes during antenna rotation
+   - Applies to both relative (manual) and absolute positioning modes
+   - Smoother visual feedback and more responsive position tracking
+
+3. Enhanced Motor Movement Functions
+   - Created incremental_move() method for chunked movements
+     * Takes total steps and breaks into 2-step increments
+     * Logs each increment for debugging
+     * Updates GUI after each increment with root.update_idletasks()
+     * Verifies position changed after first increment
+     * Returns success/failure with position verification
+     * Allows 1-step tolerance for final position accuracy
+   - Updated move_azimuth_absolute() to use incremental movements
+     * Calculates relative movement from current position
+     * Displays target and current positions during move
+     * Reports final position after completion
+   - Updated move_elevation_absolute() to use incremental movements
+     * Same incremental approach as azimuth
+     * Enforces elevation limits during movement
+   - Updated manual_move() to use incremental movements
+     * Relative movements now tracked with progress updates
+     * Applies to all CCW/CW and Up/Down button operations
+
+4. Elevation Limit Expansion
+   - Changed elevation limits from ±20° to ±75°
+   - Updated goto_absolute_elevation() validation (line 829)
+   - Updated warning label in GUI to show new ±75° limits (line 193)
+   - Updated help text and documentation throughout
+   - Provides much greater vertical scanning range
+   - Supports hemispherical radiation pattern measurements
+
+5. Auto-Connect Motor on Startup
+   - Added auto_connect_motor() method (line 448)
+   - Automatically attempts connection 500ms after GUI starts
+   - Connects to default port /dev/ttyACM0 on launch
+   - Eliminates manual connection step for standard setup
+   - Status feedback during auto-connection attempt
+   - Only attempts if port is available and not already connected
+   - Falls back to manual connection if auto-connect fails
+
+6. GUI Layout Reorganization
+   - Motor controls moved to top of window (most prominent position)
+   - Layout order now:
+     * Title and subtitle
+     * Motor Control section (rows 0-12 in manual_frame)
+     * Measurement Settings
+     * Output Settings
+     * Monitor Control buttons
+     * Status bar
+     * VNA Connection Settings (moved to bottom)
+     * Motor Controller Connection (moved to bottom)
+     * Information panel
+   - Current Position display is first element in Motor Control
+   - Absolute Position controls second (more prominent than relative)
+   - Relative Movement controls third
+   - Quick actions (Home, Emergency Stop) fourth
+   - Connection settings de-emphasized at bottom of scrollable area
+
+7. Position Display Improvements
+   - Large, bold position display with color coding
+     * Azimuth in green (16pt bold font)
+     * Elevation in blue (16pt bold font)
+   - Real-time updates during all movements
+   - Progress tracking shows percentage and current position
+   - Status bar displays movement state and completion percentage
+   - GUI remains responsive during long movements (update_idletasks())
+   - Position verification after each increment
+
+8. Updated Documentation
+   - File header updated with all new features (lines 1-16)
+   - Info panel updated with key features (lines 301-316)
+   - Help text expanded with incremental movement section (lines 782-841)
+   - Motor controls documentation enhanced (lines 820-841)
+   - Added INCREMENTAL MOVEMENT section to help
+   - Updated all references from 5-step to 2-step increments
+   - Changed elevation limit references throughout
+
+9. Movement Validation and Error Handling
+   - Position-based success verification instead of response codes
+   - Tolerance checking (1-step tolerance for 2-step increments)
+   - Direction validation (movement in correct direction counts as success)
+   - Detailed logging of each movement increment
+   - Response logging for debugging
+   - Motor timeout increased to 0.2s per increment for reliability
+   - GUI error dialogs for connection failures and limit violations
+
+10. Code Organization and Optimization
+   - INCREMENTAL_STEP_SIZE constant for easy adjustment (line 35)
+   - Consolidated movement logic in incremental_move() method
+   - Reduced code duplication across movement functions
+   - Clear separation of relative vs absolute positioning
+   - Software home offset handling in both modes
+   - Thread-safe GUI updates throughout movement operations
+   - Debug output with [Motor] prefix for all operations
+
+11. User Experience Enhancements
+   - Prominent position display catches user attention immediately
+   - Absolute positioning more accessible than relative controls
+   - Auto-connect eliminates setup step
+   - Real-time progress reduces uncertainty during movements
+   - Visual feedback at every 2-step increment
+   - Connection settings hidden at bottom (rarely changed after setup)
+   - Larger elevation range enables more comprehensive measurements
+   - CCW = Positive convention clearly stated in GUI labels
+
+Usage:
+   - GUI: python3 scripts/RSL_controller_v01.py
+   - Motor auto-connects on startup to /dev/ttyACM0
+   - Enter target degrees in "Absolute Position" section
+   - Click "Go To Az Position" or "Go To El Position"
+   - Watch real-time position updates during movement
+   - Use relative controls for fine adjustments
+   - Monitor starts automatically when motor connects
+   - All movements tracked in 2-step increments
+
+Technical Notes:
+   - Step-to-degree conversion: 200 steps = 360° (1.8° per step)
+   - 2-step increment = ~3.6° per update
+   - Position updates every 0.2 seconds during movement
+   - GUI refreshes with update_idletasks() for responsiveness
+   - Works with both hardware SETZERO and software home calibration
+
+
 Real-Time Monitor with Motor Control Integration - 03/11/26
 ============================================================
 

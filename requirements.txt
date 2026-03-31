@@ -1,0 +1,24 @@
+# Python Requirements for Antenna Aligner
+# Core data processing
+numpy>=2.4.0
+pandas>=3.0.0
+scipy>=1.17.0
+
+# Instrument control
+PyVISA>=1.16.0
+PyVISA-py>=0.8.0
+pyserial>=3.5
+
+# GUI and visualization
+matplotlib>=3.10.0
+Pillow>=12.0.0
+
+# Web services
+fastapi>=0.128.0
+uvicorn>=0.40.0
+websockets>=16.0
+simple-websocket-server>=0.4.0
+
+# Utilities
+click>=8.3.0
+pydantic>=2.12.0

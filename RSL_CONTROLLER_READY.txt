@@ -1,0 +1,125 @@
+# RSL Controller v01 - Installation Summary
+
+## ✅ Successfully Created
+
+### Main Application
+- ✅ **RSL_controller_v01.py** - Enhanced GUI with degrees, auto-start, frequent updates
+
+### Desktop Icon & Launcher
+- ✅ **RSL_Controller_v01.desktop** - Clickable desktop icon (like the others in scripts/)
+- ✅ **launch_rsl_controller.sh** - Smart launcher (executable)
+
+### Dependency Management
+- ✅ **requirements.txt** - All Python dependencies listed in project root
+- ✅ **setup_dependencies.sh** - Manual setup/maintenance script
+
+### Documentation
+- ✅ **RSL_CONTROLLER_SETUP.md** - Complete setup and usage guide
+
+## 📁 File Locations
+
+```
+/home/sd2-group2/Documents/SD2_Codespace/Antenna_Aligner/
+├── requirements.txt                         ← Dependencies
+├── RSL_CONTROLLER_SETUP.md                  ← Setup guide
+├── .venv/                                   ← Virtual environment
+│
+└── scripts/
+    ├── RSL_controller_v01.py                ← Main GUI app
+    ├── RSL_Controller_v01.desktop           ← Click to run!
+    ├── launch_rsl_controller.sh             ← Launcher (executable)
+    └── setup_dependencies.sh                ← Manual setup (executable)
+```
+
+## 🚀 How to Use
+
+### Quick Start (Recommended)
+Simply **double-click** `RSL_Controller_v01.desktop` in the scripts folder.
+
+The launcher will:
+1. ✅ Verify virtual environment exists
+2. ✅ Install/update all dependencies (including PyVISA, pyserial, etc.)
+3. ✅ Launch the GUI
+
+### Command Line
+```bash
+cd scripts
+./launch_rsl_controller.sh
+```
+
+## 🔧 Installed Dependencies
+
+All these packages are now installed and will persist after reboots:
+
+**Instrument Control:**
+- PyVISA (ZNLE6 communication)
+- PyVISA-py (backend)
+- pyserial (Arduino/motor)
+
+**Data & Processing:**
+- numpy, pandas, scipy
+
+**GUI & Plotting:**
+- matplotlib, Pillow
+
+**Web Services:**
+- FastAPI, uvicorn, websockets
+
+**Utilities:**
+- pydantic, click
+
+## 🔄 Persistence After Reboot
+
+Dependencies are preserved because:
+1. They're installed in the `.venv` virtual environment (stored on disk)
+2. The launcher script automatically reinstalls from `requirements.txt`
+3. If anything is missing, the setup runs automatically
+
+If needed after a reboot, manually run:
+```bash
+./scripts/setup_dependencies.sh
+```
+
+## ✨ RSL Controller v01 Features
+
+✅ Motor position in **degrees** (not steps)
+✅ **Auto-starts** real-time monitor on motor connection
+✅ **Frequent position updates** (every 200ms during monitoring)
+✅ Scrollable interface with all parameters visible
+✅ Manual motor controls with degree-based inputs
+✅ Real-time signal monitoring with live plot
+✅ CSV data logging with motor positions
+✅ Emergency stop and home position calibration
+
+## 📝 Next Steps
+
+1. Double-click **`RSL_Controller_v01.desktop`** to launch
+2. Connect motor controller
+3. Monitor starts automatically
+4. Move antenna and observe signal changes in real-time
+
+## 🆘 Troubleshooting
+
+**Icon won't launch?**
+```bash
+# Make launcher executable
+chmod +x /home/sd2-group2/Documents/SD2_Codespace/Antenna_Aligner/scripts/launch_rsl_controller.sh
+
+# Try manual launch
+cd /home/sd2-group2/Documents/SD2_Codespace/Antenna_Aligner/scripts
+./launch_rsl_controller.sh
+```
+
+**Missing dependencies after reboot?**
+```bash
+cd /home/sd2-group2/Documents/SD2_Codespace/Antenna_Aligner/scripts
+./setup_dependencies.sh
+```
+
+**Serial port not found?**
+- Verify Arduino is connected via USB
+- Check port in /dev (usually /dev/ttyACM0 or /dev/ttyUSB0)
+
+---
+
+**All system ready!** The RSL Controller v01 is fully configured and will work reliably across system reboots. 🎉
