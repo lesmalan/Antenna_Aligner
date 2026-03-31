@@ -410,11 +410,15 @@ class _AlignmentPageState extends State<AlignmentPage> {
     }
 
     if (sweepStatus == 'started') {
-      if (sweepType == 'azimuth') {
+      if (sweepType == 'azimuth' &&
+          _azimuthPhase != AzimuthPhase.waitingForConnection &&
+          _azimuthPhase != AzimuthPhase.ready) {
         _azimuthPhase = AzimuthPhase.sweepInProgress;
         _azimuthSweepData.clear();
         _azimuthMaxSweepAmplitude = -100.0;
-      } else if (sweepType == 'elevation') {
+      } else if (sweepType == 'elevation' &&
+          _elevationPhase != ElevationPhase.waitingForStart &&
+          _elevationPhase != ElevationPhase.ready) {
         _elevationPhase = ElevationPhase.sweepInProgress;
         _elevationSweepData.clear();
         _elevationMaxSweepAmplitude = -100.0;
@@ -535,6 +539,11 @@ class _AlignmentPageState extends State<AlignmentPage> {
 
   void _applyLiveSweepPoint(String? sweepType, SweepDataPoint point) {
     if (sweepType == 'azimuth') {
+      // Don't auto-start sweep if user hasn't pressed Start Sweep yet
+      if (_azimuthPhase == AzimuthPhase.waitingForConnection ||
+          _azimuthPhase == AzimuthPhase.ready) {
+        return;
+      }
       if (_azimuthPhase != AzimuthPhase.sweepInProgress) {
         _azimuthPhase = AzimuthPhase.sweepInProgress;
         _azimuthSweepData.clear();
@@ -548,6 +557,11 @@ class _AlignmentPageState extends State<AlignmentPage> {
       }
       _calculateAzimuthDegreesToMax();
     } else if (sweepType == 'elevation') {
+      // Don't auto-start sweep if user hasn't pressed Start Sweep yet
+      if (_elevationPhase == ElevationPhase.waitingForStart ||
+          _elevationPhase == ElevationPhase.ready) {
+        return;
+      }
       if (_elevationPhase != ElevationPhase.sweepInProgress) {
         _elevationPhase = ElevationPhase.sweepInProgress;
         _elevationSweepData.clear();
@@ -1521,6 +1535,19 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       ],
                       actions: [
                         ElevatedButton.icon(
+                          onPressed: _restartAzimuthSweep,
+                          icon: const Icon(Icons.restart_alt),
+                          label: const Text('Restart Sweep'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kThemeNavy,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
+                          ),
+                        ),
+                        ElevatedButton.icon(
                           onPressed: _completeSweep,
                           icon: const Icon(Icons.stop_circle_outlined),
                           label: const Text('Stop Sweep'),
@@ -1734,6 +1761,19 @@ class _AlignmentPageState extends State<AlignmentPage> {
                         ),
                       ],
                       actions: [
+                        ElevatedButton.icon(
+                          onPressed: _restartElevationSweep,
+                          icon: const Icon(Icons.restart_alt),
+                          label: const Text('Restart Sweep'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kThemeNavy,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
+                          ),
+                        ),
                         ElevatedButton.icon(
                           onPressed: _completeElevationSweep,
                           icon: const Icon(Icons.stop_circle_outlined),
@@ -2512,9 +2552,16 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _azimuthPhase = AzimuthPhase.sweepInProgress;
       _azimuthSweepData.clear();
       _azimuthMaxSweepAmplitude = -100.0;
+      _azimuthMaxSweepDegree = 0.0;
+      _azimuthDegreesToMaxAmplitude = 0.0;
       _isRecordingAzimuth = true;
     });
     _sendStartSweep('azimuth');
+  }
+
+  void _restartAzimuthSweep() {
+    _sendStopSweep();
+    _startAzimuthSweep();
   }
 
   void _startElevationSweep() {
@@ -2522,9 +2569,16 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _elevationPhase = ElevationPhase.sweepInProgress;
       _elevationSweepData.clear();
       _elevationMaxSweepAmplitude = -100.0;
+      _elevationMaxSweepDegree = 0.0;
+      _elevationDegreesToMaxAmplitude = 0.0;
       _isRecordingElevation = true;
     });
     _sendStartSweep('elevation');
+  }
+
+  void _restartElevationSweep() {
+    _sendStopSweep();
+    _startElevationSweep();
   }
 
   void _completeSweep() {
