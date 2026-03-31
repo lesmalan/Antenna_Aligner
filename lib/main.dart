@@ -297,6 +297,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _azimuthPhase = AzimuthPhase.sweepInProgress;
       _azimuthSweepData.clear();
       _azimuthMaxSweepAmplitude = -100.0;
+      _isRecordingAzimuth = true;
+      _sendStartSweep('azimuth');
     }
 
     if (amplitudeEntry != null && allowAmplitudeFromPacket) {
@@ -2423,12 +2425,14 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _elevationPhase = ElevationPhase.sweepInProgress;
       _elevationSweepData.clear();
       _elevationMaxSweepAmplitude = -100.0;
+      _isRecordingElevation = true;
     });
     _sendStartSweep('elevation');
   }
 
   void _completeSweep() {
     _sendStopSweep();
+    _isRecordingAzimuth = false;
     setState(() {
       if (_azimuthSweepData.isEmpty) {
         _azimuthSweepData.add(
@@ -2470,6 +2474,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
 
   void _completeElevationSweep() {
     _sendStopSweep();
+    _isRecordingElevation = false;
     setState(() {
       if (_elevationSweepData.isEmpty) {
         _elevationSweepData.add(
@@ -2520,7 +2525,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _azimuthMaxSweepDegree = 0.0;
       _azimuthDegreesToMaxAmplitude = 0.0;
       _azimuthConfirmed = false;
-      _isRecordingAzimuth = false;
+      _isRecordingAzimuth = true;
 
       // Reset elevation state
       _elevationPhase = ElevationPhase.waitingForStart;
