@@ -30,12 +30,19 @@ enum AlignmentStep { azimuth, elevation, finalized }
 
 enum AzimuthPhase {
   waitingForConnection,
+  ready,
   sweepInProgress,
   sweepComplete,
   aligned,
 }
 
-enum ElevationPhase { waitingForStart, sweepInProgress, sweepComplete, aligned }
+enum ElevationPhase {
+  waitingForStart,
+  ready,
+  sweepInProgress,
+  sweepComplete,
+  aligned,
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -292,11 +299,9 @@ class _AlignmentPageState extends State<AlignmentPage> {
     _lastParsedAmplitude = amplitudeEntry?.value;
     _lastAmplitudeApplied = false;
 
-    // Keep initial flow behavior: sweep starts once link is live.
+    // Move to ready state once link is live (user will press Start Sweep).
     if (_azimuthPhase == AzimuthPhase.waitingForConnection) {
-      _azimuthPhase = AzimuthPhase.sweepInProgress;
-      _azimuthSweepData.clear();
-      _azimuthMaxSweepAmplitude = -100.0;
+      _azimuthPhase = AzimuthPhase.ready;
     }
 
     if (amplitudeEntry != null && allowAmplitudeFromPacket) {
@@ -405,11 +410,15 @@ class _AlignmentPageState extends State<AlignmentPage> {
     }
 
     if (sweepStatus == 'started') {
-      if (sweepType == 'azimuth') {
+      if (sweepType == 'azimuth' &&
+          _azimuthPhase != AzimuthPhase.waitingForConnection &&
+          _azimuthPhase != AzimuthPhase.ready) {
         _azimuthPhase = AzimuthPhase.sweepInProgress;
         _azimuthSweepData.clear();
         _azimuthMaxSweepAmplitude = -100.0;
-      } else if (sweepType == 'elevation') {
+      } else if (sweepType == 'elevation' &&
+          _elevationPhase != ElevationPhase.waitingForStart &&
+          _elevationPhase != ElevationPhase.ready) {
         _elevationPhase = ElevationPhase.sweepInProgress;
         _elevationSweepData.clear();
         _elevationMaxSweepAmplitude = -100.0;
@@ -530,6 +539,11 @@ class _AlignmentPageState extends State<AlignmentPage> {
 
   void _applyLiveSweepPoint(String? sweepType, SweepDataPoint point) {
     if (sweepType == 'azimuth') {
+      // Don't auto-start sweep if user hasn't pressed Start Sweep yet
+      if (_azimuthPhase == AzimuthPhase.waitingForConnection ||
+          _azimuthPhase == AzimuthPhase.ready) {
+        return;
+      }
       if (_azimuthPhase != AzimuthPhase.sweepInProgress) {
         _azimuthPhase = AzimuthPhase.sweepInProgress;
         _azimuthSweepData.clear();
@@ -543,6 +557,11 @@ class _AlignmentPageState extends State<AlignmentPage> {
       }
       _calculateAzimuthDegreesToMax();
     } else if (sweepType == 'elevation') {
+      // Don't auto-start sweep if user hasn't pressed Start Sweep yet
+      if (_elevationPhase == ElevationPhase.waitingForStart ||
+          _elevationPhase == ElevationPhase.ready) {
+        return;
+      }
       if (_elevationPhase != ElevationPhase.sweepInProgress) {
         _elevationPhase = ElevationPhase.sweepInProgress;
         _elevationSweepData.clear();
@@ -1003,13 +1022,15 @@ class _AlignmentPageState extends State<AlignmentPage> {
     }
 
     // Show sweep phase screen
-    if (_azimuthPhase == AzimuthPhase.sweepInProgress ||
+    if (_azimuthPhase == AzimuthPhase.ready ||
+        _azimuthPhase == AzimuthPhase.sweepInProgress ||
         _azimuthPhase == AzimuthPhase.sweepComplete) {
       return _buildAzimuthSweepScreen();
     }
 
     // Show elevation sweep phase screen
-    if (_elevationPhase == ElevationPhase.sweepInProgress ||
+    if (_elevationPhase == ElevationPhase.ready ||
+        _elevationPhase == ElevationPhase.sweepInProgress ||
         _elevationPhase == ElevationPhase.sweepComplete) {
       return _buildElevationSweepScreen();
     }
@@ -1396,6 +1417,67 @@ class _AlignmentPageState extends State<AlignmentPage> {
   }
 
   Widget _buildAzimuthSweepScreen() {
+    if (_azimuthPhase == AzimuthPhase.ready) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Azimuth Sweep'),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Colors.white,
+          actions: [_buildDebugToggleAction()],
+        ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildLiveFeedDebugPanel(),
+                    _buildVnaDataPanel(
+                      title: 'Current Position',
+                      subtitle: 'Live telemetry from VNA and motor controller.',
+                      metrics: [
+                        _buildVnaMetricTile(
+                          icon: Icons.sensors_rounded,
+                          label: 'Current Amplitude',
+                          value: '${_currentAmplitude.toStringAsFixed(1)} dB',
+                          accentColor: kThemeNavy,
+                          supportingText: 'Live reading from VNA',
+                        ),
+                        _buildVnaMetricTile(
+                          icon: Icons.explore_rounded,
+                          label: 'Current Azimuth',
+                          value: '${_azimuthCurrentDegree.toStringAsFixed(1)}°',
+                          accentColor: kThemeBurgundy,
+                          supportingText: 'Live azimuth degree position',
+                        ),
+                      ],
+                      actions: [
+                        ElevatedButton.icon(
+                          onPressed: _startAzimuthSweep,
+                          icon: const Icon(Icons.play_circle_outline),
+                          label: const Text('Start Sweep'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kThemeNavy,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 32,
+                              vertical: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     if (_azimuthPhase == AzimuthPhase.sweepInProgress) {
       return Scaffold(
         appBar: AppBar(
@@ -1417,16 +1499,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       child: SizedBox(
                         height: 320,
                         child: _buildIncomingSignalGraph(),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                      child: _buildLiveSweepGuidance(
-                        axisName: 'Azimuth',
-                        stepsTaken: _azimuthSweepData.length,
-                        degreesToPeak: _azimuthDegreesToMaxAmplitude,
-                        peakAmplitude: _azimuthMaxSweepAmplitude,
-                        peakDegree: _azimuthMaxSweepDegree,
                       ),
                     ),
                     _buildLiveFeedDebugPanel(),
@@ -1456,10 +1528,25 @@ class _AlignmentPageState extends State<AlignmentPage> {
                               ? '--'
                               : '${_azimuthMaxSweepAmplitude.toStringAsFixed(1)} dB',
                           accentColor: Colors.green[700]!,
-                          supportingText: 'Highest received during sweep',
+                          supportingText: _azimuthSweepData.isEmpty
+                              ? 'Highest received during sweep'
+                              : 'At ${_azimuthMaxSweepDegree.toStringAsFixed(1)}°',
                         ),
                       ],
                       actions: [
+                        ElevatedButton.icon(
+                          onPressed: _restartAzimuthSweep,
+                          icon: const Icon(Icons.restart_alt),
+                          label: const Text('Restart Sweep'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kThemeNavy,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
+                          ),
+                        ),
                         ElevatedButton.icon(
                           onPressed: _completeSweep,
                           icon: const Icon(Icons.stop_circle_outlined),
@@ -1555,6 +1642,68 @@ class _AlignmentPageState extends State<AlignmentPage> {
   }
 
   Widget _buildElevationSweepScreen() {
+    if (_elevationPhase == ElevationPhase.ready) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Elevation Sweep'),
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          foregroundColor: Colors.white,
+          actions: [_buildDebugToggleAction()],
+        ),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildLiveFeedDebugPanel(),
+                    _buildVnaDataPanel(
+                      title: 'Current Position',
+                      subtitle: 'Live telemetry from VNA and motor controller.',
+                      metrics: [
+                        _buildVnaMetricTile(
+                          icon: Icons.sensors_rounded,
+                          label: 'Current Amplitude',
+                          value: '${_currentAmplitude.toStringAsFixed(1)} dB',
+                          accentColor: kThemeNavy,
+                          supportingText: 'Live reading from VNA',
+                        ),
+                        _buildVnaMetricTile(
+                          icon: Icons.explore_rounded,
+                          label: 'Current Elevation',
+                          value:
+                              '${_elevationCurrentDegree.toStringAsFixed(1)}°',
+                          accentColor: kThemeBurgundy,
+                          supportingText: 'Live elevation degree position',
+                        ),
+                      ],
+                      actions: [
+                        ElevatedButton.icon(
+                          onPressed: _startElevationSweep,
+                          icon: const Icon(Icons.play_circle_outline),
+                          label: const Text('Start Sweep'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kThemeNavy,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 32,
+                              vertical: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     if (_elevationPhase == ElevationPhase.sweepInProgress) {
       return Scaffold(
         appBar: AppBar(
@@ -1576,17 +1725,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
                       child: SizedBox(
                         height: 320,
                         child: _buildIncomingSignalGraph(),
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                      child: _buildLiveSweepGuidance(
-                        axisName: 'Elevation',
-                        stepsTaken: _elevationSweepData.length,
-                        degreesToPeak: _elevationDegreesToMaxAmplitude,
-                        peakAmplitude: _elevationMaxSweepAmplitude,
-                        peakDegree: _elevationMaxSweepDegree,
-                        isVertical: true,
                       ),
                     ),
                     _buildLiveFeedDebugPanel(),
@@ -1617,10 +1755,25 @@ class _AlignmentPageState extends State<AlignmentPage> {
                               ? '--'
                               : '${_elevationMaxSweepAmplitude.toStringAsFixed(1)} dB',
                           accentColor: Colors.green[700]!,
-                          supportingText: 'Highest received during sweep',
+                          supportingText: _elevationSweepData.isEmpty
+                              ? 'Highest received during sweep'
+                              : 'At ${_elevationMaxSweepDegree.toStringAsFixed(1)}°',
                         ),
                       ],
                       actions: [
+                        ElevatedButton.icon(
+                          onPressed: _restartElevationSweep,
+                          icon: const Icon(Icons.restart_alt),
+                          label: const Text('Restart Sweep'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kThemeNavy,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
+                          ),
+                        ),
                         ElevatedButton.icon(
                           onPressed: _completeElevationSweep,
                           icon: const Icon(Icons.stop_circle_outlined),
@@ -1716,67 +1869,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
     return const SizedBox.shrink();
   }
 
-  Widget _buildLiveSweepGuidance({
-    required String axisName,
-    required int stepsTaken,
-    required double degreesToPeak,
-    required double peakAmplitude,
-    required double peakDegree,
-    bool isVertical = false,
-  }) {
-    final hasPeak = stepsTaken > 1;
-    final closeToPeak = degreesToPeak.abs() < 0.2;
-    final direction = degreesToPeak < 0
-        ? (isVertical ? 'DOWN' : 'LEFT')
-        : (isVertical ? 'UP' : 'RIGHT');
-
-    final message = !hasPeak
-        ? 'Sweep the motor to search for the highest amplitude.'
-        : closeToPeak
-        ? 'Highest amplitude found. Stop sweep now; you are already at the peak position.'
-        : 'Highest amplitude found. Stop sweep and go back $direction ${degreesToPeak.abs().toStringAsFixed(1)} deg.';
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: kThemeBurgundyLight,
-        border: Border.all(color: kThemeBurgundy),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '$axisName Sweep Guidance',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-              color: kThemeBurgundyDark,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            message,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: kThemeBurgundyDark,
-              height: 1.35,
-            ),
-          ),
-          if (hasPeak) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Peak amplitude so far: ${peakAmplitude.toStringAsFixed(1)} dB at ${peakDegree.toStringAsFixed(1)} deg',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.black87,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   Widget _buildIncomingSignalGraph() {
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1831,7 +1923,13 @@ class _AlignmentPageState extends State<AlignmentPage> {
   }) {
     final delta = targetDegree - currentDegree;
     final isAtTarget = delta.abs() <= _positionToleranceDeg;
-    final direction = delta < 0
+
+    // Direction from origin (0°) to the target
+    final fromOriginDirection = targetDegree < 0
+        ? (isVertical ? 'DOWN' : 'LEFT / CCW')
+        : (isVertical ? 'UP' : 'RIGHT / CW');
+    // Direction the user needs to move NOW (from current position)
+    final moveDirection = delta < 0
         ? (isVertical ? 'DOWN' : 'LEFT / CCW')
         : (isVertical ? 'UP' : 'RIGHT / CW');
 
@@ -1872,6 +1970,37 @@ class _AlignmentPageState extends State<AlignmentPage> {
           ),
           const SizedBox(height: 14),
 
+          // Instruction from origin
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: kThemeNavy.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: kThemeNavy.withValues(alpha: 0.15)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Peak found ${targetDegree.abs().toStringAsFixed(1)}° $fromOriginDirection from origin',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    color: kThemeNavyDark,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Return to ${targetDegree.toStringAsFixed(1)}° to align.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: kThemeNavyDark),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+
           // Live position + target row
           Row(
             children: [
@@ -1900,7 +2029,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
           ),
           const SizedBox(height: 14),
 
-          // Direction instruction
+          // Remaining distance instruction
           if (!isAtTarget) ...[
             Container(
               width: double.infinity,
@@ -1923,7 +2052,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Go $direction ${delta.abs().toStringAsFixed(1)}°',
+                      'Go $moveDirection ${delta.abs().toStringAsFixed(1)}° to reach target',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: kThemeBurgundyDark,
                         fontWeight: FontWeight.w700,
@@ -2418,17 +2547,43 @@ class _AlignmentPageState extends State<AlignmentPage> {
     );
   }
 
+  void _startAzimuthSweep() {
+    setState(() {
+      _azimuthPhase = AzimuthPhase.sweepInProgress;
+      _azimuthSweepData.clear();
+      _azimuthMaxSweepAmplitude = -100.0;
+      _azimuthMaxSweepDegree = 0.0;
+      _azimuthDegreesToMaxAmplitude = 0.0;
+      _isRecordingAzimuth = true;
+    });
+    _sendStartSweep('azimuth');
+  }
+
+  void _restartAzimuthSweep() {
+    _sendStopSweep();
+    _startAzimuthSweep();
+  }
+
   void _startElevationSweep() {
     setState(() {
       _elevationPhase = ElevationPhase.sweepInProgress;
       _elevationSweepData.clear();
       _elevationMaxSweepAmplitude = -100.0;
+      _elevationMaxSweepDegree = 0.0;
+      _elevationDegreesToMaxAmplitude = 0.0;
+      _isRecordingElevation = true;
     });
     _sendStartSweep('elevation');
   }
 
+  void _restartElevationSweep() {
+    _sendStopSweep();
+    _startElevationSweep();
+  }
+
   void _completeSweep() {
     _sendStopSweep();
+    _isRecordingAzimuth = false;
     setState(() {
       if (_azimuthSweepData.isEmpty) {
         _azimuthSweepData.add(
@@ -2453,10 +2608,8 @@ class _AlignmentPageState extends State<AlignmentPage> {
         _azimuthPhase = AzimuthPhase.aligned;
         _azimuthConfirmed = true;
         _currentStep = AlignmentStep.elevation;
+        _elevationPhase = ElevationPhase.ready;
       });
-
-      // Immediately start elevation sweep after azimuth is confirmed
-      _startElevationSweep();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -2470,6 +2623,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
 
   void _completeElevationSweep() {
     _sendStopSweep();
+    _isRecordingElevation = false;
     setState(() {
       if (_elevationSweepData.isEmpty) {
         _elevationSweepData.add(
@@ -2514,7 +2668,7 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _currentStep = AlignmentStep.azimuth;
 
       // Reset azimuth state
-      _azimuthPhase = AzimuthPhase.sweepInProgress;
+      _azimuthPhase = AzimuthPhase.ready;
       _azimuthSweepData.clear();
       _azimuthMaxSweepAmplitude = -100.0;
       _azimuthMaxSweepDegree = 0.0;
@@ -2531,8 +2685,6 @@ class _AlignmentPageState extends State<AlignmentPage> {
       _elevationConfirmed = false;
       _isRecordingElevation = false;
     });
-
-    _sendStartSweep('azimuth');
   }
 
   // Support helpline prompt: displays the support phone number to call
