@@ -1,3 +1,43 @@
+Documentation and Licensing Updates - 04/21/26
+==============================================
+
+1. README.md Project Acknowledgments
+   - Added section crediting development team:
+     * Lorelei Potter - Computer Engineer
+     * Brett Bailey - Electrical Engineer  
+     * Les Malan - Mechanical Engineer
+   - Listed project advisors:
+     * Dr Alaeddin Abuabed
+     * Dr Nasreen Alsbou
+     * Dr Mohammad Robi Hossan
+   - Added special thanks to Mr Cole Ranck (EE, ASRC Federal)
+
+2. README.md Normal Operation Section
+   - Added step-by-step normal operation workflow for RSL Controller v01
+   - Step 1: Prepare hardware (Arduino and ZNLE6 power)
+   - Step 2: Launch application and auto-connect motor
+   - Step 3: Set current position as home/origin
+   - Step 4: Enter target azimuth/elevation and move
+
+3. README.md Quick Start Updates
+   - Added Raspberry Pi 5 WebSocket server step
+   - Clarified server must run before launching mobile/emulator
+   - Command: python3 pi_websocket_server.py
+   - Enables connection from mobile devices and Flutter emulator
+
+4. Hardware Configuration Motor Shield Documentation
+   - Documented Arduino Uno R3 has Adafruit Motor Shield v2 soldered
+   - Azimuth motor: Connected to M1 and M2
+   - Elevation motor: Connected to M3 and M4
+   - Provides hardware reference for motor control implementation
+
+5. Creative Commons Attribution License
+   - Added CC BY 4.0 license to LICENSE.txt
+   - Includes copyright attribution to project team
+   - Allows personal and educational use freely
+   - Restricts commercial use without explicit permission
+   - Includes standard CC BY terms and disclaimers
+
 RSL Controller v01 Enhanced Motor Control - 03/31/26
 =====================================================
 
