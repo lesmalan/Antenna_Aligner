@@ -1,0 +1,141 @@
+TURNBUCKLE / LEAD-SCREW CONVERSION INSTRUCTIONS
+
+Purpose
+- Convert the Flutter app from stepper-motor degree-based positioning to manual lead-screw turnbuckle positioning.
+- Keep the same live signal data feed (amplitude from Pi/VNA).
+- Remove dependency on Arduino motor position input.
+- Replace degree guidance with user-entered turn counts (starting from center, sweep left, then sweep right).
+
+--------------------------------------------------
+1) Functional Behavior Change
+--------------------------------------------------
+
+Current behavior
+- App tracks azimuth/elevation positions using degree values from motor telemetry.
+- App computes rotation instructions in degrees.
+
+New behavior (manual turnbuckles)
+- User starts from mechanical center (0 turns).
+- User manually turns LEFT from center and records turn count + live amplitude.
+- User then moves through center and continues RIGHT, recording turn count + live amplitude.
+- App finds the maximum received signal from all sampled points.
+- App reports the best turn position relative to center (for example: -2.5 turns means 2.5 turns left of center).
+
+Sign convention recommendation
+- Left of center = negative turns (example: -3.0)
+- Right of center = positive turns (example: +4.0)
+
+--------------------------------------------------
+2) Data Input Rules
+--------------------------------------------------
+
+Keep these inputs the same
+- Incoming WebSocket amplitude payload format (amplitude/rsl/signal fields) remains unchanged.
+
+Remove these inputs
+- Arduino/motor position fields (azimuth_degree, elevation_degree, motor_position, etc.) are no longer required.
+
+Add this user input
+- Manual turn count field in UI (double, supports negative and positive values).
+- Each sample point is created from:
+	1. User-entered turn count
+	2. Current live amplitude from feed
+
+Optional payload extension (if desired)
+- You may include a user-provided turn value in outbound messages for logging only, but this is not required for operation.
+
+--------------------------------------------------
+3) Recommended Workflow in App
+--------------------------------------------------
+
+Screen/state flow
+1. Wait for feed connection (same as now).
+2. Show manual sweep setup card:
+	 - "Set turnbuckle to center (0 turns)."
+	 - Button: "Begin Manual Sweep".
+3. Sweep recording mode:
+	 - User enters current turn count.
+	 - Button: "Record Point".
+	 - App stores (turn, amplitude).
+	 - Instruct user to sweep left first, then all the way right.
+4. Complete sweep:
+	 - Button: "Finish Sweep".
+	 - App computes max amplitude point.
+5. Alignment confirmation:
+	 - Show best turn offset and current turn.
+	 - User adjusts to best turn and confirms.
+
+Important operational instruction text (in UI)
+- "Start at center (0), sweep left while recording points, return through center, then sweep right while recording points."
+- "Record enough points on both sides to ensure the true maximum is captured."
+
+--------------------------------------------------
+4) Code-Level Migration Notes (lib/main.dart)
+--------------------------------------------------
+
+4.1 Replace degree point model with turns
+- Replace/rename:
+	SweepDataPoint.degree -> SweepDataPoint.turnsFromCenter
+- Keep amplitude unchanged.
+
+Suggested model
+- class SweepDataPoint {
+		final double turnsFromCenter;
+		final double amplitude;
+	}
+
+4.2 Remove position parsing from incoming packets
+- In _applyIncomingPacket(), remove reliance on:
+	- azimuth/elevation degree keys
+	- positioning payload maps/lists
+	- status text parsing for AZ/EL
+- Keep amplitude extraction logic as-is.
+
+4.3 Add user-entered turn state
+- Add state variable:
+	- double _manualTurnInput = 0.0;
+- Add text field controller (or number stepper control) for turns.
+
+4.4 Change point recording source
+- Do not auto-record using motor position.
+- Add explicit "Record Point" action:
+	- point.turnsFromCenter = _manualTurnInput
+	- point.amplitude = _currentAmplitude
+
+4.5 Replace direction calculations
+- Replace degree-to-target math with turn-to-target math:
+	turnsToTarget = bestTurn - currentTurnInput
+- UI direction:
+	- turnsToTarget < 0 => move LEFT
+	- turnsToTarget > 0 => move RIGHT
+
+4.6 Simplify axis handling (recommended)
+- If hardware is now one manual lead-screw axis, simplify by removing azimuth/elevation split.
+- Use one sweep list and one alignment confirmation stage.
+- If two turnbuckles exist (one per axis), duplicate the same manual-turn flow per axis.
+
+--------------------------------------------------
+5) Validation Checklist
+--------------------------------------------------
+
+Use this checklist after conversion:
+- App connects and receives live amplitude without motor/Arduino fields.
+- User can enter negative/positive turn values.
+- "Record Point" stores turn + amplitude correctly.
+- Sweep result identifies max amplitude point.
+- Final prompt tells user exactly how many turns left/right to reach max.
+- Works when max is on left side, right side, or center.
+
+--------------------------------------------------
+6) Suggested Operator Procedure (for documentation/training)
+--------------------------------------------------
+
+1. Set turnbuckle to center reference (0 turns).
+2. Start sweep in app.
+3. Move left in small increments, recording points at each stop.
+4. Return through center.
+5. Continue right in small increments, recording points at each stop.
+6. Finish sweep and read suggested best turn offset.
+7. Adjust to target turn value and confirm alignment.
+
+End of instructions.
